@@ -1,0 +1,24 @@
+FILE: empty.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|() public final annotation class Nonclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Nonclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final fun box(): R|kotlin/String| {
+        ^box @R|st/evening/kt/invokecontrol/ICUnchecked|(permissions = vararg(String(enclave), String(unused))) R|foo/bar/foo|().R|kotlin/String.plus|(@R|st/evening/kt/invokecontrol/ICUnchecked|() R|foo/bar/bar|())
+    }
+    @R|foo/bar/Enclave|() public final fun foo(): R|kotlin/String| {
+        ^foo String(O)
+    }
+    @R|foo/bar/Nonclave|() @R|st/evening/kt/invokecontrol/ICRestrict|() public final fun bar(): R|kotlin/String| {
+        ^bar String(K)
+    }

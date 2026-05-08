@@ -1,0 +1,19 @@
+FILE: constructor.kt
+    package foo.bar
+
+    public final fun box(): R|kotlin/String| {
+        ^box R|foo/bar/foo|()
+    }
+    public final fun foo(): R|kotlin/String| {
+        ^foo R|foo/bar/Test.Test|().R|foo/bar/Test.bar|()
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(enclave))) public final class Test : R|kotlin/Any| {
+        public constructor(): R|foo/bar/Test| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun bar(): R|kotlin/String| {
+            ^bar String(OK)
+        }
+
+    }

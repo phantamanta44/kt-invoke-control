@@ -1,0 +1,42 @@
+FILE: override.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final fun box(): R|kotlin/String| {
+        ^box R|foo/bar/Bar.Bar|().R|foo/bar/Bar.talk|()
+    }
+    public open class Foo : R|kotlin/Any| {
+        public constructor(): R|foo/bar/Foo| {
+            super<R|kotlin/Any|>()
+        }
+
+        @R|foo/bar/Enclave|() public open fun talk(): R|kotlin/String| {
+            ^talk <strcat>(String(ER), this@R|foo/bar/Foo|.R|foo/bar/Foo.text|)
+        }
+
+        @R|foo/bar/Enclave|() public open val text: R|kotlin/String|
+            public get(): R|kotlin/String| {
+                ^ String(ROR)
+            }
+
+    }
+    public final class Bar : R|foo/bar/Foo| {
+        public constructor(): R|foo/bar/Bar| {
+            super<R|foo/bar/Foo|>()
+        }
+
+        public open override fun talk(): R|kotlin/String| {
+            ^talk <strcat>(String(O), this@R|foo/bar/Bar|.R|foo/bar/Bar.text|)
+        }
+
+        public open override val text: R|kotlin/String|
+            public get(): R|kotlin/String| {
+                ^ String(K)
+            }
+
+    }

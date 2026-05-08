@@ -1,0 +1,21 @@
+FILE: function.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.FUNCTION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.EXPRESSION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final fun box(): R|kotlin/String| {
+        ^box R|foo/bar/foo|(<L> = @R|foo/bar/Enclave|() foo@fun <anonymous>(it: R|kotlin/String|): R|kotlin/String| <inline=NoInline>  {
+            ^ R|foo/bar/flip|(R|<local>/it|)
+        }
+        )
+    }
+    public final fun foo(f: R|@R|foo/bar/Enclave|()  [enclave] ([] kotlin/String) -> [] kotlin/String|): R|kotlin/String| {
+        ^foo R|<local>/f|.R|SubstitutionOverride<kotlin/Function1.invoke: R|kotlin/String|>|(String(KO))
+    }
+    @R|foo/bar/Enclave|() public final fun flip(x: R|[] kotlin/String|): R|kotlin/String| {
+        ^flip R|<local>/x|.R|kotlin/text/reversed|()
+    }

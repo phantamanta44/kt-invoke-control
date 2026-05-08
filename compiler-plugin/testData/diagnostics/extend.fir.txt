@@ -1,0 +1,40 @@
+FILE: extend.kt
+    package foo.bar
+
+    public final fun box(): R|kotlin/String| {
+        ^box R|foo/bar/Foo2.Foo2|().R|foo/bar/Foo2.test|().R|kotlin/String.plus|(R|foo/bar/Bar2.Bar2|().R|foo/bar/Bar2.test|())
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(enclave))) public open class Foo1 : R|kotlin/Any| {
+        public constructor(): R|foo/bar/Foo1| {
+            super<R|kotlin/Any|>()
+        }
+
+        public open fun test(): R|kotlin/String| {
+            ^test String(Z)
+        }
+
+    }
+    public final class Foo2 : R|foo/bar/Foo1| {
+        public constructor(): R|foo/bar/Foo2| {
+            super<R|foo/bar/Foo1|>()
+        }
+
+        public open override fun test(): R|kotlin/String| {
+            ^test String(O)
+        }
+
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(enclave))) public abstract interface Bar1 : R|kotlin/Any| {
+        public abstract fun test(): R|kotlin/String|
+
+    }
+    public final class Bar2 : R|foo/bar/Bar1| {
+        public constructor(): R|foo/bar/Bar2| {
+            super<R|kotlin/Any|>()
+        }
+
+        public open override fun test(): R|kotlin/String| {
+            ^test String(K)
+        }
+
+    }

@@ -1,0 +1,22 @@
+FILE: cast.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class R : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/R| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(secret))) @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class X : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/X| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final val f: R|[] () -> () -> [] kotlin/String| = throw R|kotlin/NotImplementedError.NotImplementedError|()
+        public get(): R|() -> () -> kotlin/String|
+    @R|kotlin/Suppress|(names = vararg(String(USELESS_CAST))) public final fun box(): R|kotlin/Unit| {
+        lval test1: R|[] () -> () -> [] kotlin/String| = (R|foo/bar/f| as R|() -> () -> kotlin/String|)
+        lval test2: R|@R|foo/bar/R|()  [enclave] () -> () -> [] kotlin/String| = (R|foo/bar/f| as R|@R|foo/bar/R|()  () -> () -> kotlin/String|)
+        lval test3: R|[] () -> () -> [] kotlin/String| = (R|foo/bar/f| as R|() -> () -> kotlin/String|)
+    }

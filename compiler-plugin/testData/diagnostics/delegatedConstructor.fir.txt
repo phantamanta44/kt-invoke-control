@@ -1,0 +1,25 @@
+FILE: delegatedConstructor.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final fun box(): R|kotlin/String| {
+        ^box R|foo/bar/Test.Test|().R|foo/bar/Test.value|
+    }
+    public final class Test : R|kotlin/Any| {
+        @R|foo/bar/Enclave|() private constructor(value: R|[] kotlin/String|): R|foo/bar/Test| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val value: R|[] kotlin/String| = R|<local>/value|
+            public get(): R|kotlin/String|
+
+        public constructor(): R|foo/bar/Test| {
+            this<R|foo/bar/Test|>(String(OK))
+        }
+
+    }

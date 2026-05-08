@@ -1,0 +1,22 @@
+FILE: object.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    @R|foo/bar/Enclave|() public final object Utils : R|kotlin/Any| {
+        private constructor(): R|foo/bar/Utils| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun ok(): R|kotlin/String| {
+            ^ok String(OK)
+        }
+
+    }
+    public final fun box(): R|kotlin/String| {
+        ^box Q|foo/bar/Utils|.R|foo/bar/Utils.ok|()
+    }

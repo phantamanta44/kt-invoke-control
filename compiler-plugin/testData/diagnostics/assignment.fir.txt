@@ -1,0 +1,55 @@
+FILE: assignment.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class R : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/R| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public open class A : R|kotlin/Any| {
+        public constructor(): R|foo/bar/A| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public open class B : R|foo/bar/A| {
+        public constructor(): R|foo/bar/B| {
+            super<R|foo/bar/A|>()
+        }
+
+    }
+    public final val f: R|[] ([] foo/bar/A) -> [] foo/bar/B| = throw R|kotlin/NotImplementedError.NotImplementedError|()
+        public get(): R|(foo/bar/A) -> foo/bar/B|
+    public final val g: R|@R|foo/bar/R|()  [enclave] ([] foo/bar/A) -> [] foo/bar/B| = throw R|kotlin/NotImplementedError.NotImplementedError|()
+        public get(): R|@R|foo/bar/R|()  (foo/bar/A) -> foo/bar/B|
+    public final val h: R|[] ([] foo/bar/A) -> ([] foo/bar/B) -> [] foo/bar/B| = throw R|kotlin/NotImplementedError.NotImplementedError|()
+        public get(): R|(foo/bar/A) -> (foo/bar/B) -> foo/bar/B|
+    public final val i: R|[] (([] foo/bar/A) -> [] foo/bar/B) -> [] foo/bar/B| = throw R|kotlin/NotImplementedError.NotImplementedError|()
+        public get(): R|((foo/bar/A) -> foo/bar/B) -> foo/bar/B|
+    public final val j: R|[] kotlin/Comparable<([] foo/bar/A) -> [] foo/bar/B>| = throw R|kotlin/NotImplementedError.NotImplementedError|()
+        public get(): R|kotlin/Comparable<(foo/bar/A) -> foo/bar/B>|
+    public final val k: R|[] kotlin/collections/List<([] foo/bar/A) -> [] foo/bar/B>| = throw R|kotlin/NotImplementedError.NotImplementedError|()
+        public get(): R|kotlin/collections/List<(foo/bar/A) -> foo/bar/B>|
+    public final fun test(): R|kotlin/Unit| {
+        lval fgTest1: R|[] ([] foo/bar/A) -> [] foo/bar/B| = R|foo/bar/f|
+        lval fgTest2: R|@R|foo/bar/R|()  [enclave] ([] foo/bar/A) -> [] foo/bar/B| = R|foo/bar/f|
+        lval fgTest3: R|[] ([] foo/bar/A) -> [] foo/bar/B| = R|foo/bar/g|
+        lval fgTest4: R|@R|foo/bar/R|()  [enclave] ([] foo/bar/A) -> [] foo/bar/B| = R|foo/bar/g|
+        lval fgTest5: R|[] ([] foo/bar/A) -> [] foo/bar/A| = R|foo/bar/f|
+        lval fgTest6: R|[] ([] foo/bar/A) -> [] foo/bar/A| = R|foo/bar/g|
+        lval fgTest7: R|@R|foo/bar/R|()  [enclave] ([] foo/bar/A) -> [] foo/bar/A| = R|foo/bar/f|
+        lval fgTest8: R|@R|foo/bar/R|()  [enclave] ([] foo/bar/A) -> [] foo/bar/A| = R|foo/bar/g|
+        lval hiTest1: R|[] ([] foo/bar/A) -> ([] foo/bar/B) -> [] foo/bar/B| = R|foo/bar/h|
+        lval hiTest2: R|[] (([] foo/bar/A) -> [] foo/bar/B) -> [] foo/bar/B| = R|foo/bar/i|
+        lval hiTest3: R|@R|foo/bar/R|()  [enclave] ([] foo/bar/A) -> ([] foo/bar/B) -> [] foo/bar/B| = R|foo/bar/h|
+        lval hiTest4: R|@R|foo/bar/R|()  [enclave] (([] foo/bar/A) -> [] foo/bar/B) -> [] foo/bar/B| = R|foo/bar/i|
+        lval hiTest5: R|[] ([] foo/bar/A) -> ([] foo/bar/B) -> [] foo/bar/B| = R|foo/bar/h|
+        lval hiTest6: R|[] (([] foo/bar/A) -> [] foo/bar/B) -> [] foo/bar/B| = R|foo/bar/i|
+        lval hiTest7: R|@R|foo/bar/R|()  [enclave] ([] foo/bar/A) -> ([] foo/bar/B) -> [] foo/bar/B| = R|foo/bar/h|
+        lval hiTest8: R|@R|foo/bar/R|()  [enclave] (([] foo/bar/A) -> [] foo/bar/B) -> [] foo/bar/B| = R|foo/bar/i|
+        lval jkTest1: R|[] kotlin/Int| = R|foo/bar/j|.R|SubstitutionOverride<kotlin/Comparable.compareTo: R|kotlin/Int|>|(R|foo/bar/f|)
+        lval jkTest2: R|[] ([] foo/bar/A) -> [] foo/bar/B| = R|foo/bar/k|.R|SubstitutionOverride<kotlin/collections/List.get: R|@R|foo/bar/R|()  (foo/bar/A) -> foo/bar/B|>|(Int(0))
+        lval jkTest3: R|[] kotlin/Int| = R|foo/bar/j|.R|SubstitutionOverride<kotlin/Comparable.compareTo: R|kotlin/Int|>|(R|foo/bar/g|)
+        lval jkTest4: R|@R|foo/bar/R|()  [enclave] ([] foo/bar/A) -> [] foo/bar/B| = R|foo/bar/k|.R|SubstitutionOverride<kotlin/collections/List.get: R|@R|foo/bar/R|()  (foo/bar/A) -> foo/bar/B|>|(Int(0))
+    }

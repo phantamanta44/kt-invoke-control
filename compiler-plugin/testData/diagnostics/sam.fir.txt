@@ -1,0 +1,25 @@
+FILE: sam.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.FUNCTION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.EXPRESSION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final fun box(): R|kotlin/String| {
+        ^box R|foo/bar/runFactory|(<L> = SAM(@R|foo/bar/Enclave|() runFactory@fun <anonymous>(): R|kotlin/String| <inline=NoInline>  {
+            ^ R|foo/bar/okay|()
+        }
+        ))
+    }
+    public abstract fun interface OkFactory : R|kotlin/Any| {
+        public abstract fun cookOneUp(): R|kotlin/String|
+
+    }
+    public final fun runFactory(factory: R|[] foo/bar/OkFactory|): R|kotlin/String| {
+        ^runFactory R|<local>/factory|.R|foo/bar/OkFactory.cookOneUp|()
+    }
+    @R|foo/bar/Enclave|() public final fun okay(): R|kotlin/String| {
+        ^okay String(OK)
+    }

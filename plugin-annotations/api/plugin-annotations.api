@@ -1,0 +1,3 @@
+public abstract interface annotation class st/evening/kt/invokecontrol/ICRestrict : java/lang/annotation/Annotation {
+	public abstract fun permissions ()[Ljava/lang/String;
+}

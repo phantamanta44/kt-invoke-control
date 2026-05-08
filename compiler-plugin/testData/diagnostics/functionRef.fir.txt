@@ -1,0 +1,22 @@
+FILE: functionRef.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.FUNCTION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.PROPERTY|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.EXPRESSION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final fun box(): R|kotlin/String| {
+        ^box R|foo/bar/runEnclave|<R|kotlin/String|>(::R|foo/bar/foo|).R|kotlin/String.plus|(R|foo/bar/runEnclave|<R|kotlin/String|>(::R|foo/bar/bar|))
+    }
+    public final fun <T> runEnclave(f: R|[] () -> T|): R|T| {
+        ^runEnclave R|<local>/f|.R|SubstitutionOverride<kotlin/Function0.invoke: R|T|>|()
+    }
+    @R|foo/bar/Enclave|() public final fun foo(): R|kotlin/String| {
+        ^foo String(OK)
+    }
+    @R|foo/bar/Enclave|() public final val bar: R|kotlin/String|
+        public get(): R|kotlin/String| {
+            ^ String(K)
+        }

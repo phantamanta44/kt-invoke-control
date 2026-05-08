@@ -1,0 +1,30 @@
+FILE: expression.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final val foo: R|@R|foo/bar/Enclave|()  [enclave] ([] kotlin/String) -> [] kotlin/String| = throw R|kotlin/NotImplementedError.NotImplementedError|()
+        public get(): R|@R|foo/bar/Enclave|()  (kotlin/String) -> kotlin/String|
+    public final fun bar(): R|@R|foo/bar/Enclave|()  (kotlin/String) -> kotlin/String| {
+        ^bar throw R|kotlin/NotImplementedError.NotImplementedError|()
+    }
+    public final fun test(): R|kotlin/Unit| {
+        R|foo/bar/runF|(R|foo/bar/foo|)
+        R|foo/bar/runF|(R|foo/bar/bar|())
+        R|foo/bar/runT|(SAM(R|foo/bar/foo|))
+        R|foo/bar/runT|(SAM(R|foo/bar/bar|()))
+    }
+    public final fun runF(f: R|[] ([] kotlin/String) -> [] kotlin/String|): R|kotlin/String| {
+        ^runF R|<local>/f|.R|SubstitutionOverride<kotlin/Function1.invoke: R|kotlin/String|>|(String(test))
+    }
+    public final fun runT(transformer: R|[] foo/bar/StringTransformer|): R|kotlin/String| {
+        ^runT R|<local>/transformer|.R|foo/bar/StringTransformer.apply|(String(test))
+    }
+    public abstract fun interface StringTransformer : R|kotlin/Any| {
+        public abstract fun apply(value: R|[] kotlin/String|): R|kotlin/String|
+
+    }
