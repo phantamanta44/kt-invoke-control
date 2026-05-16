@@ -1,7 +1,6 @@
 package st.evening.kt.invokecontrol.kplugin.permission
 
-
-class PermissionSet(private val table: Map<String, Set<String>>) {
+class PermissionSet(private val table: Map<Permission, Set<String>>) {
     companion object {
         val EMPTY: PermissionSet = PermissionSet(emptyMap())
 
@@ -14,13 +13,13 @@ class PermissionSet(private val table: Map<String, Set<String>>) {
 
     fun isEmpty(): Boolean = table.isEmpty()
 
-    operator fun contains(permission: String): Boolean = permission in table
+    operator fun contains(permission: Permission): Boolean = permission in table
 
-    fun containsAll(permissions: Collection<String>): Boolean = table.keys.containsAll(permissions)
+    fun containsAll(permissions: Collection<Permission>): Boolean = table.keys.containsAll(permissions)
 
     fun containsAll(o: PermissionSet): Boolean = containsAll(o.table.keys)
 
-    fun getPermissions(): Set<String> = table.keys
+    fun getPermissions(): Set<Permission> = table.keys
 
     fun getProvenance(): Set<String> = table.values.flatMapTo(mutableSetOf()) { it }
 
@@ -36,7 +35,7 @@ class PermissionSet(private val table: Map<String, Set<String>>) {
         return PermissionSet(result)
     }
 
-    operator fun minus(o: Collection<String>): PermissionSet {
+    operator fun minus(o: Collection<Permission>): PermissionSet {
         val newTable = table.toMutableMap()
         o.forEach { newTable.remove(it) }
         return PermissionSet(newTable)
@@ -45,13 +44,13 @@ class PermissionSet(private val table: Map<String, Set<String>>) {
     operator fun minus(o: PermissionSet): PermissionSet = this - o.getPermissions()
 
     class Builder {
-        private val table: MutableMap<String, MutableSet<String>> = mutableMapOf()
+        private val table: MutableMap<Permission, MutableSet<String>> = mutableMapOf()
 
-        fun add(permission: String, source: String) {
+        fun add(permission: Permission, source: String) {
             table.getOrPut(permission) { HashSet() } += source
         }
 
-        fun addAll(permissions: Collection<String>, source: String) {
+        fun addAll(permissions: Collection<Permission>, source: String) {
             permissions.forEach { add(it, source) }
         }
 

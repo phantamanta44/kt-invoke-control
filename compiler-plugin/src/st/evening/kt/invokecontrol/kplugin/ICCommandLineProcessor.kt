@@ -16,11 +16,11 @@ import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.name.ClassId
 import st.evening.kt.invokecontrol.BuildConfig
-import st.evening.kt.invokecontrol.kplugin.permission.PermissionFactory
+import st.evening.kt.invokecontrol.kplugin.permission.Permission
 
 class ICCommandLineProcessor : CommandLineProcessor {
     companion object {
-        val RESTRICT_ANNOTATIONS: CompilerConfigurationKey<Map<ClassId, List<PermissionFactory>>> =
+        val RESTRICT_ANNOTATIONS: CompilerConfigurationKey<Map<ClassId, List<Permission>>> =
             CompilerConfigurationKey.create("kic-restrict-annotation")
     }
 
@@ -43,15 +43,15 @@ class ICCommandLineProcessor : CommandLineProcessor {
                 if (parts.size != 2) {
                     throw IllegalArgumentException("Malformed restrict annotation option: $value")
                 }
-                val factories = context(CliDiagnosticReporter, CliDiagnosticContext) {
-                    parts[1].split(',').map { PermissionFactory.fromTemplate(it, null)!! }
+                val permissions = context(CliDiagnosticReporter, CliDiagnosticContext) {
+                    parts[1].split(',').map { Permission.fromTemplate(it, null)!! }
                 }
                 val annotations = configuration.getMap(RESTRICT_ANNOTATIONS)
                 if (annotations is HashMap<*, *>) {
-                    annotations[ClassId.fromString(parts[0])] = factories
+                    annotations[ClassId.fromString(parts[0])] = permissions
                 } else {
                     val newAnnotations = HashMap(annotations)
-                    newAnnotations[ClassId.fromString(parts[0])] = factories
+                    newAnnotations[ClassId.fromString(parts[0])] = permissions
                     configuration.put(RESTRICT_ANNOTATIONS, newAnnotations)
                 }
             }

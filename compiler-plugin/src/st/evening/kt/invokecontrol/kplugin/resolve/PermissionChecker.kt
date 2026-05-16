@@ -4,6 +4,9 @@ import org.jetbrains.kotlin.AbstractKtSourceElement
 import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.diagnostics.DiagnosticContext
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
+import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactory0
+import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactory1
+import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactory2
 import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.SessionAndScopeSessionHolder
@@ -20,7 +23,10 @@ import org.jetbrains.kotlin.fir.declarations.FirReceiverParameter
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.FirTypeAlias
+import org.jetbrains.kotlin.fir.declarations.FirValueParameter
+import org.jetbrains.kotlin.fir.declarations.evaluateAs
 import org.jetbrains.kotlin.fir.declarations.findArgumentByName
+import org.jetbrains.kotlin.fir.declarations.getStringArgument
 import org.jetbrains.kotlin.fir.declarations.toAnnotationClassIdSafe
 import org.jetbrains.kotlin.fir.declarations.unwrapVarargValue
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
@@ -42,6 +48,7 @@ import org.jetbrains.kotlin.fir.expressions.argument
 import org.jetbrains.kotlin.fir.expressions.arguments
 import org.jetbrains.kotlin.fir.references.FirNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
+import org.jetbrains.kotlin.fir.references.resolved
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
@@ -73,6 +80,7 @@ import org.jetbrains.kotlin.fir.types.renderForDebugging
 import org.jetbrains.kotlin.fir.types.resolvedType
 import org.jetbrains.kotlin.fir.types.typeContext
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
+import org.jetbrains.kotlin.psi.psiUtil.isIdentifier
 import org.jetbrains.kotlin.types.AbstractTypeChecker
 import org.jetbrains.kotlin.types.TypeCheckerState
 import org.jetbrains.kotlin.types.model.TypeCheckerProviderContext
@@ -94,10 +102,13 @@ import org.jetbrains.kotlin.types.model.typeConstructor
 import org.jetbrains.kotlin.util.wrapIntoSourceCodeAnalysisExceptionIfNeeded
 import st.evening.kt.invokecontrol.kplugin.ICDiagnostics
 import st.evening.kt.invokecontrol.kplugin.ICNames
+import st.evening.kt.invokecontrol.kplugin.permission.Permission
 import st.evening.kt.invokecontrol.kplugin.permission.PermissionP
 import st.evening.kt.invokecontrol.kplugin.permission.PermissionSet
 import st.evening.kt.invokecontrol.kplugin.permission.icFunctionTypePermissions
+import st.evening.kt.invokecontrol.kplugin.permission.substituteOrSelf
 import st.evening.kt.invokecontrol.kplugin.util.forEachVarargArgument
+import st.evening.kt.invokecontrol.kplugin.util.setUnion
 import st.evening.kt.invokecontrol.kplugin.util.unwrapClassType
 
 internal class PermissionChecker(
@@ -105,16 +116,26 @@ internal class PermissionChecker(
     private val dContext: DiagnosticContext,
     private val reporter: DiagnosticReporter
 ) : FirDefaultVisitor<Nothing?, PermissionChecker.Context>(), SessionAndScopeSessionHolder by resolveService {
-    class Context(val parentContext: Context?, val localPermissions: Set<String>) {
-        constructor() : this(null, emptySet())
-
-        val permissions: Set<String>
-            by lazy { parentContext?.permissions?.let { it + localPermissions } ?: localPermissions }
+    class Context(val permissions: Set<Permission>, val scope: Set<String>) {
+        constructor() : this(emptySet(), emptySet())
     }
 
-    private inline fun void(action: () -> Unit): Nothing? {
-        action()
-        return null
+    private fun reportOn(source: AbstractKtSourceElement?, factory: KtDiagnosticFactory0) {
+        context(dContext) {
+            reporter.reportOn(source, factory)
+        }
+    }
+
+    private fun <A> reportOn(source: AbstractKtSourceElement?, factory: KtDiagnosticFactory1<A>, a: A) {
+        context(dContext) {
+            reporter.reportOn(source, factory, a)
+        }
+    }
+
+    private fun <A, B> reportOn(source: AbstractKtSourceElement?, factory: KtDiagnosticFactory2<A, B>, a: A, b: B) {
+        context(dContext) {
+            reporter.reportOn(source, factory, a, b)
+        }
     }
 
     private inline fun withErrorHandling(source: KtSourceElement?, action: () -> Unit) {
@@ -135,25 +156,72 @@ internal class PermissionChecker(
         return null
     }
 
-    override fun visitElement(element: FirElement, data: Context): Nothing? = void {
+    override fun visitElement(element: FirElement, data: Context): Nothing? {
         element.acceptChildren(this, data)
+        return null
+    }
+
+    private fun FirValueParameter.getKeyForConstant(): String? {
+        val annotation = annotations.find { it.toAnnotationClassIdSafe(session) == ICNames.ANNOT_CONSTANT }
+            ?: return null
+        val explicitKey = annotation.getStringArgument(ICNames.ARG_KEY, session)
+        if (explicitKey.isNullOrBlank()) {
+            return name.asString()
+        }
+        if (!explicitKey.isIdentifier()) {
+            reportOn(annotation.source, ICDiagnostics.KIC_INVALID_PERMISSION_ARGUMENT_KEY, explicitKey)
+            return null
+        }
+        return explicitKey
+    }
+
+    private fun List<Permission.Segment>.checkWellScoped(
+        scope: Set<String>,
+        source: AbstractKtSourceElement?
+    ): Boolean {
+        forEach {
+            if (it is Permission.Segment.Variable) {
+                val key = it.key
+                if (key !in scope) {
+                    reportOn(source, ICDiagnostics.KIC_NO_SUCH_PERMISSION_ARGUMENT, key)
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
+    private fun Permission.checkWellScoped(scope: Set<String>): Boolean = segments.checkWellScoped(scope, source)
+
+    private fun Set<Permission>.checkWellScoped(scope: Set<String>): Set<Permission> {
+        val wellScoped = mutableSetOf<Permission>()
+        forEach {
+            if (it.checkWellScoped(scope)) {
+                wellScoped += it
+            }
+        }
+        return wellScoped
     }
 
     private inline fun extendAndCheck(
         declaration: FirDeclaration,
         parentContext: Context,
         check: (Context) -> Unit
-    ): Nothing? = void {
-        val subContext = Context(
-            parentContext,
-            context(dContext, reporter) {
-                resolveService.getDeclarationAnnotatedPermissions(declaration)
+    ): Nothing? {
+        val subScope = (declaration as? FirFunction)?.let { function ->
+            parentContext.scope setUnion function.valueParameters.mapNotNullTo(mutableSetOf()) {
+                it.getKeyForConstant()
             }
-        )
+        } ?: parentContext.scope
+        val localPermissions = context(dContext, reporter) {
+            resolveService.getDeclarationAnnotatedPermissions(declaration)
+        }.checkWellScoped(subScope)
+        val subContext = Context(parentContext.permissions setUnion localPermissions, subScope)
         withErrorHandling(declaration.source) {
             check(subContext)
         }
         visitElement(declaration, subContext)
+        return null
     }
 
     private fun checkReferencedTypePermissions(
@@ -164,14 +232,12 @@ internal class PermissionChecker(
         if (requiredPermissions.isEmpty()) return
         val missingPermissions = requiredPermissions - context.permissions
         if (missingPermissions.isEmpty()) return
-        context(dContext) {
-            reporter.reportOn(
-                source,
-                ICDiagnostics.KIC_LEAKY_DECLARATION,
-                missingPermissions.getPermissions(),
-                missingPermissions.getProvenance()
-            )
-        }
+        reportOn(
+            source,
+            ICDiagnostics.KIC_LEAKY_DECLARATION,
+            missingPermissions.getPermissions(),
+            missingPermissions.getProvenance()
+        )
     }
 
     @OptIn(SymbolInternals::class)
@@ -255,12 +321,17 @@ internal class PermissionChecker(
         checkReferencedTypePermissions(declaration.source, context, builderAction)
     }
 
-    private fun substitute(substitutor: ConeSubstitutor?, type: ConeKotlinType): ConeKotlinType =
-        substitutor?.substituteOrNull(type) ?: type
+    private fun substitute(
+        typeSubst: ConeSubstitutor?,
+        permissionSubst: Permission.Substitution?,
+        type: ConeKotlinType
+    ): ConeKotlinType = context(dContext, session.typeContext) {
+        (typeSubst?.substituteOrNull(type) ?: type).substituteOrSelf(permissionSubst)
+    }
 
     private sealed interface FunctionTypeCheckResult {
         object Success : FunctionTypeCheckResult
-        class Leak(val leakedPermissions: Set<String>) : FunctionTypeCheckResult
+        class Leak(val leakedPermissions: Set<Permission>) : FunctionTypeCheckResult
         class Poison(val source: AbstractKtSourceElement?) : FunctionTypeCheckResult
         object Pass : FunctionTypeCheckResult
     }
@@ -271,11 +342,12 @@ internal class PermissionChecker(
         destSource: AbstractKtSourceElement?,
         valueType: ConeKotlinType,
         valueSource: AbstractKtSourceElement?,
-        substitutor: ConeSubstitutor?
+        typeSubst: ConeSubstitutor?,
+        permissionSubst: Permission.Substitution?
     ): FunctionTypeCheckResult {
-        val destClassType = substitute(substitutor, destType)
+        val destClassType = substitute(typeSubst, permissionSubst, destType)
             .unwrapClassType()?.fullyExpandedType() ?: return FunctionTypeCheckResult.Pass
-        val valueClassType = substitute(substitutor, valueType)
+        val valueClassType = substitute(typeSubst, permissionSubst, valueType)
             .unwrapClassType()?.fullyExpandedType() ?: return FunctionTypeCheckResult.Pass
         if (!typeContext.areEqualTypeConstructors(destClassType.typeConstructor(), valueClassType.typeConstructor())) {
             return FunctionTypeCheckResult.Pass
@@ -322,15 +394,16 @@ internal class PermissionChecker(
         destSource: AbstractKtSourceElement?,
         valueType: ConeKotlinType,
         valueSource: AbstractKtSourceElement?,
-        substitutor: ConeSubstitutor?
+        typeSubst: ConeSubstitutor?,
+        permissionSubst: Permission.Substitution?
     ): FunctionTypeCheckResult {
         if (isSimpleSubtype(destType.typeConstructor(), valueType.typeConstructor())) {
             return FunctionTypeCheckResult.Success
         }
 
-        val destClassType = substitute(substitutor, destType)
+        val destClassType = substitute(typeSubst, permissionSubst, destType)
             .unwrapClassType()?.fullyExpandedType() ?: return FunctionTypeCheckResult.Pass
-        val valueClassType = substitute(substitutor, valueType)
+        val valueClassType = substitute(typeSubst, permissionSubst, valueType)
             .unwrapClassType()?.fullyExpandedType() ?: return FunctionTypeCheckResult.Pass
 
         val destCtor = destClassType.typeConstructor()
@@ -375,9 +448,14 @@ internal class PermissionChecker(
                     destArg.getVariance()
                 ) ?: continue
                 val result = when (variance) {
-                    TypeVariance.INV -> checkTypesEqual(valueArgType, valueSource, destArgType, destSource, substitutor)
-                    TypeVariance.IN -> checkIsSubtype(valueArgType, valueSource, destArgType, destSource, substitutor)
-                    TypeVariance.OUT -> checkIsSubtype(destArgType, destSource, valueArgType, valueSource, substitutor)
+                    TypeVariance.INV ->
+                        checkTypesEqual(valueArgType, valueSource, destArgType, destSource, typeSubst, permissionSubst)
+
+                    TypeVariance.IN ->
+                        checkIsSubtype(valueArgType, valueSource, destArgType, destSource, typeSubst, permissionSubst)
+
+                    TypeVariance.OUT ->
+                        checkIsSubtype(destArgType, destSource, valueArgType, valueSource, typeSubst, permissionSubst)
                 }
                 if (result != FunctionTypeCheckResult.Success) return result
             }
@@ -389,7 +467,8 @@ internal class PermissionChecker(
     private fun checkAssignment(
         destination: FirCallableDeclaration,
         value: FirExpression,
-        substitutor: ConeSubstitutor?
+        typeSubst: ConeSubstitutor?,
+        permissionSubst: Permission.Substitution?
     ) {
         context(reporter) {
             resolveService.resolveReturnTypePermissions(destination)
@@ -405,18 +484,15 @@ internal class PermissionChecker(
                 destination.source,
                 value.resolvedType,
                 value.source,
-                substitutor
+                typeSubst,
+                permissionSubst
             )
         }
         when (result) {
-            is FunctionTypeCheckResult.Leak -> context(dContext) {
-                reporter.reportOn(value.source, ICDiagnostics.KIC_LEAKY_ASSIGNMENT, result.leakedPermissions)
-            }
+            is FunctionTypeCheckResult.Leak ->
+                reportOn(value.source, ICDiagnostics.KIC_LEAKY_ASSIGNMENT, result.leakedPermissions)
 
-            is FunctionTypeCheckResult.Poison -> context(dContext) {
-                reporter.reportOn(result.source, ICDiagnostics.KIC_POISON_FUNCTION_TYPE)
-            }
-
+            is FunctionTypeCheckResult.Poison -> reportOn(result.source, ICDiagnostics.KIC_POISON_FUNCTION_TYPE)
             else -> {}
         }
     }
@@ -425,7 +501,8 @@ internal class PermissionChecker(
     private fun checkAssignment(
         destination: FirReceiverParameter,
         value: FirExpression,
-        substitutor: ConeSubstitutor?
+        typeSubst: ConeSubstitutor?,
+        permissionSubst: Permission.Substitution?
     ) {
         context(reporter) {
             resolveService.resolveReturnTypePermissions(destination)
@@ -441,18 +518,15 @@ internal class PermissionChecker(
                 destination.source,
                 value.resolvedType,
                 value.source,
-                substitutor
+                typeSubst,
+                permissionSubst
             )
         }
         when (result) {
-            is FunctionTypeCheckResult.Leak -> context(dContext) {
-                reporter.reportOn(value.source, ICDiagnostics.KIC_LEAKY_ASSIGNMENT, result.leakedPermissions)
-            }
+            is FunctionTypeCheckResult.Leak ->
+                reportOn(value.source, ICDiagnostics.KIC_LEAKY_ASSIGNMENT, result.leakedPermissions)
 
-            is FunctionTypeCheckResult.Poison -> context(dContext) {
-                reporter.reportOn(result.source, ICDiagnostics.KIC_POISON_FUNCTION_TYPE)
-            }
-
+            is FunctionTypeCheckResult.Poison -> reportOn(result.source, ICDiagnostics.KIC_POISON_FUNCTION_TYPE)
             else -> {}
         }
     }
@@ -460,96 +534,193 @@ internal class PermissionChecker(
     private fun checkAccessPermissions(
         expression: FirExpression,
         referentName: String,
-        requiredPermissions: Set<String>?,
+        requiredPermissions: Set<Permission>?,
         context: Context
     ) {
         val grant = expression.annotations.find { it.toAnnotationClassIdSafe(session) == ICNames.ANNOT_UNCHECKED }
         if (!requiredPermissions.isNullOrEmpty()) {
             val remainingPermissions = requiredPermissions.toMutableSet().apply { removeAll(context.permissions) }
             if (grant != null) {
-                val redundantPermissions = mutableSetOf<String>()
-                grant.forEachVarargArgument<FirLiteralExpression>(ICNames.ARG_PERMISSIONS, session) {
-                    val permission = it.value as String
-                    if (!remainingPermissions.remove(permission)) {
-                        redundantPermissions += permission
+                val redundantPermissions = mutableSetOf<Permission>()
+                context(dContext, reporter) {
+                    grant.forEachVarargArgument<FirLiteralExpression>(ICNames.ARG_PERMISSIONS, session) { argument ->
+                        Permission.fromTemplate(argument.value as String, argument.source)?.let {
+                            if (it.checkWellScoped(context.scope) && !remainingPermissions.remove(it)) {
+                                redundantPermissions += it
+                            }
+                        }
                     }
                 }
                 if (redundantPermissions.isNotEmpty()) {
-                    context(dContext) {
-                        reporter.reportOn(grant.source, ICDiagnostics.KIC_REDUNDANT_UNCHECKED, redundantPermissions)
-                    }
+                    reportOn(grant.source, ICDiagnostics.KIC_REDUNDANT_UNCHECKED, redundantPermissions)
                 }
             }
             if (remainingPermissions.isNotEmpty()) {
-                context(dContext) {
-                    reporter.reportOn(
-                        expression.source,
-                        ICDiagnostics.KIC_INSUFFICIENT_PERMISSIONS,
-                        remainingPermissions,
-                        setOf(referentName)
-                    )
-                }
+                reportOn(
+                    expression.source,
+                    ICDiagnostics.KIC_INSUFFICIENT_PERMISSIONS,
+                    remainingPermissions,
+                    setOf(referentName)
+                )
             }
         } else if (grant != null) {
-            val redundantPermissions = mutableSetOf<String>()
-            grant.forEachVarargArgument<FirLiteralExpression>(ICNames.ARG_PERMISSIONS, session) {
-                redundantPermissions += it.value as String
+            val redundantPermissions = mutableSetOf<Permission>()
+            context(dContext, reporter) {
+                grant.forEachVarargArgument<FirLiteralExpression>(ICNames.ARG_PERMISSIONS, session) { argument ->
+                    Permission.fromTemplate(argument.value as String, argument.source)?.let {
+                        if (it.checkWellScoped(context.scope)) {
+                            redundantPermissions += it
+                        }
+                    }
+                }
             }
             if (redundantPermissions.isNotEmpty()) {
-                context(dContext) {
-                    reporter.reportOn(grant.source, ICDiagnostics.KIC_REDUNDANT_UNCHECKED, redundantPermissions)
-                }
+                reportOn(grant.source, ICDiagnostics.KIC_REDUNDANT_UNCHECKED, redundantPermissions)
             }
         }
     }
 
     @OptIn(SymbolInternals::class)
+    private fun buildPermissionSubstitution(
+        valueParameters: List<FirValueParameter>,
+        valueArguments: List<FirExpression>,
+        context: Context
+    ): Permission.Substitution? {
+        val permissionArguments = mutableMapOf<String, List<Permission.Segment>>() // TODO check for name clashes?
+        valueParameters.forEachIndexed { index, parameter ->
+            val key = parameter.getKeyForConstant() ?: return@forEachIndexed
+            when (val argument = valueArguments[index]) {
+                is FirLiteralExpression -> {
+                    val value = argument.value
+                    if (value !is String) {
+                        reportOn(argument.source, ICDiagnostics.KIC_INVALID_PERMISSION_ARGUMENT_VALUE, key)
+                        return null
+                    }
+                    val permission = context(dContext, reporter) {
+                        Permission.parseTemplate(value, argument.source)
+                    } ?: return null
+                    if (!permission.checkWellScoped(context.scope, argument.source)) return null
+                    permissionArguments[key] = permission
+                }
+
+                is FirPropertyAccessExpression -> {
+                    when (val referent = argument.calleeReference.resolved!!.resolvedSymbol.fir) {
+                        is FirProperty -> {
+                            val initializer = referent.initializer
+                            if (!referent.status.isConst || initializer == null) {
+                                reportOn(argument.source, ICDiagnostics.KIC_NOT_CONSTANT)
+                                return null
+                            }
+                            val literal = initializer.evaluateAs<FirLiteralExpression>(session)
+                            if (literal == null) {
+                                reportOn(argument.source, ICDiagnostics.KIC_NOT_CONSTANT)
+                                return null
+                            }
+                            val value = literal.value
+                            if (value !is String) {
+                                reportOn(
+                                    argument.source,
+                                    ICDiagnostics.KIC_INVALID_PERMISSION_ARGUMENT_VALUE,
+                                    value.toString()
+                                )
+                                return null
+                            }
+                            permissionArguments[key] = listOf(Permission.Segment.Literal(value))
+                        }
+
+                        is FirValueParameter -> {
+                            val valueKey = referent.getKeyForConstant()
+                            if (valueKey == null) {
+                                reportOn(argument.source, ICDiagnostics.KIC_NOT_CONSTANT)
+                                return null
+                            }
+                            permissionArguments[key] = listOf(Permission.Segment.Variable(valueKey))
+                        }
+
+                        else -> {
+                            reportOn(argument.source, ICDiagnostics.KIC_NOT_CONSTANT)
+                            return null
+                        }
+                    }
+
+                }
+
+                else -> {
+                    reportOn(argument.source, ICDiagnostics.KIC_NOT_CONSTANT)
+                    return null
+                }
+            }
+        }
+        return Permission.Substitution { key, source ->
+            permissionArguments[key]?.let { return@Substitution it }
+            if (key in context.scope) {
+                return@Substitution listOf(Permission.Segment.Variable(key))
+            }
+            reporter.reportOn(source, ICDiagnostics.KIC_NO_SUCH_PERMISSION_ARGUMENT, key)
+            return@Substitution null
+        }
+    }
+
+    @OptIn(SymbolInternals::class)
     private fun <E> checkAccessExpression(expression: E, context: Context) where E : FirExpression, E : FirResolvable {
-        // check call permissions
         val calleeReference = expression.calleeReference as? FirNamedReference ?: return
+        if (calleeReference !is FirResolvedNamedReference) return
+        val callee = calleeReference.resolvedSymbol.fir as FirCallableDeclaration
+        val permissionSubst: Permission.Substitution?
+
+        // check argument types
+        context(session.typeContext) {
+            val qaeExpression = expression as? FirQualifiedAccessExpression
+            val typeSubst = qaeExpression?.let { resolveService.getSubstitutor(reporter, it) }
+
+            if (callee is FirFunction) {
+                val valueParameters = callee.valueParameters
+                val valueArguments = (expression as FirCall).arguments
+                if (valueParameters.size != valueArguments.size) return
+                permissionSubst = buildPermissionSubstitution(valueParameters, valueArguments, context) ?: return
+                valueParameters.forEachIndexed { index, parameter ->
+                    checkAssignment(parameter, valueArguments[index], typeSubst, permissionSubst)
+                }
+            } else {
+                permissionSubst = null
+            }
+
+            if (qaeExpression != null) {
+                callee.receiverParameter?.let { receiverParameter ->
+                    expression.extensionReceiver?.let {
+                        checkAssignment(receiverParameter, it, typeSubst, permissionSubst)
+                    }
+                }
+            }
+
+            if (expression is FirContextArgumentListOwner) {
+                val contextParameters = callee.contextParameters
+                val contextArguments = expression.contextArguments
+                if (contextParameters.size == contextArguments.size) {
+                    contextParameters.forEachIndexed { index, parameter ->
+                        checkAssignment(parameter, contextArguments[index], typeSubst, permissionSubst)
+                    }
+                }
+            }
+        }
+
+        // check call permissions
         val (calleeName, requiredPermissions) = context(dContext, reporter) {
             resolveService.resolveCallable(
                 calleeReference,
                 (expression as? FirQualifiedAccessExpression)?.dispatchReceiver
             )
         }
-        checkAccessPermissions(expression, calleeName, requiredPermissions, context)
-
-        // check argument types
-        if (calleeReference is FirResolvedNamedReference) {
-            val callee = calleeReference.resolvedSymbol.fir as FirCallableDeclaration
-            context(session.typeContext) {
-                val substitutor: ConeSubstitutor?
-                if (expression is FirQualifiedAccessExpression) {
-                    substitutor = resolveService.getSubstitutor(reporter, expression)
-                    callee.receiverParameter?.let { receiverParameter ->
-                        expression.extensionReceiver?.let {
-                            checkAssignment(receiverParameter, it, substitutor)
-                        }
-                    }
-                } else {
-                    substitutor = null
+        checkAccessPermissions(
+            expression,
+            calleeName,
+            requiredPermissions?.let {
+                context(dContext) {
+                    it.substituteOrSelf(permissionSubst)
                 }
-                if (expression is FirContextArgumentListOwner) {
-                    val contextParameters = callee.contextParameters
-                    val contextArguments = expression.contextArguments
-                    if (contextParameters.size == contextArguments.size) {
-                        contextParameters.forEachIndexed { index, parameter ->
-                            checkAssignment(parameter, contextArguments[index], substitutor)
-                        }
-                    }
-                }
-                if (callee is FirFunction) {
-                    val valueParameters = callee.valueParameters
-                    val valueArguments = (expression as FirCall).arguments
-                    if (valueParameters.size == valueArguments.size) {
-                        valueParameters.forEachIndexed { index, parameter ->
-                            checkAssignment(parameter, valueArguments[index], substitutor)
-                        }
-                    }
-                }
-            }
-        }
+            },
+            context
+        )
     }
 
     // Declarations
@@ -567,7 +738,7 @@ internal class PermissionChecker(
         }
 
     @OptIn(SymbolInternals::class, ScopeFunctionRequiresPrewarm::class)
-    override fun visitProperty(property: FirProperty, data: Context): Nothing? = void {
+    override fun visitProperty(property: FirProperty, data: Context): Nothing? {
         extendAndCheckReferencedTypePermissions(property, data) { builder ->
             builder.addFromType(property.returnTypeRef)
             property.receiverParameter?.let { builder.addFromType(it.typeRef) }
@@ -593,10 +764,11 @@ internal class PermissionChecker(
         withErrorHandling(property.source) {
             property.initializer?.let {
                 context(session.typeContext) {
-                    checkAssignment(property, it, null)
+                    checkAssignment(property, it, null, null)
                 }
             }
         }
+        return null
     }
 
     @OptIn(SymbolInternals::class, ScopeFunctionRequiresPrewarm::class)
@@ -617,13 +789,24 @@ internal class PermissionChecker(
                     session, resolveService.scopeSession, true, FirResolvePhase.ANNOTATION_ARGUMENTS
                 )
                 scope.processFunctionsByName(namedFunction.name) {}
-                scope.getDirectOverriddenFunctions(namedFunction.symbol, true).forEach {
+                scope.getDirectOverriddenFunctions(namedFunction.symbol, true).forEach { superFunctionSymbol ->
+                    val superFunction = superFunctionSymbol.fir
                     builder.addAll(
                         context(reporter) {
-                            resolveService.getDeclarationAnnotatedPermissions(it.fir)
+                            resolveService.getDeclarationAnnotatedPermissions(superFunction)
                         },
-                        it.name.asStringStripSpecialMarkers()
+                        superFunctionSymbol.name.asStringStripSpecialMarkers()
                     )
+                    superFunction.valueParameters.forEachIndexed { index, superParameter ->
+                        val superKey = superParameter.getKeyForConstant() ?: return@forEachIndexed
+                        val hereParameter = namedFunction.valueParameters[index]
+                        val hereKey = hereParameter.getKeyForConstant()
+                        if (hereKey == null) {
+                            reportOn(hereParameter.source, ICDiagnostics.KIC_NOT_CONSTANT)
+                        } else if (hereKey != superKey) {
+                            reportOn(hereParameter.source, ICDiagnostics.KIC_OVERRIDE_CONSTANT_MISMATCH, superKey)
+                        }
+                    }
                 }
                 // FIXME ensure overrides in classes implementing function types have correct permissions
             }
@@ -640,7 +823,7 @@ internal class PermissionChecker(
         }
 
     override fun visitAnonymousFunction(anonymousFunction: FirAnonymousFunction, data: Context): Nothing? =
-        extendAndCheck(anonymousFunction, data) {
+        extendAndCheck(anonymousFunction, data) { // TODO infer local permissions from lambda use site?
             context(reporter) {
                 resolveService.resolveLambda(anonymousFunction)
             }
@@ -717,21 +900,16 @@ internal class PermissionChecker(
                             targetTypeRef.source,
                             argument.resolvedType,
                             argument.source,
+                            null,
                             null
                         )
                     }
                     when (result) {
-                        is FunctionTypeCheckResult.Leak -> context(dContext) {
-                            reporter.reportOn(
-                                typeOperatorCall.source,
-                                ICDiagnostics.KIC_LEAKY_CAST,
-                                result.leakedPermissions
-                            )
-                        }
+                        is FunctionTypeCheckResult.Leak ->
+                            reportOn(typeOperatorCall.source, ICDiagnostics.KIC_LEAKY_CAST, result.leakedPermissions)
 
-                        is FunctionTypeCheckResult.Poison -> context(dContext) {
-                            reporter.reportOn(result.source, ICDiagnostics.KIC_POISON_FUNCTION_TYPE)
-                        }
+                        is FunctionTypeCheckResult.Poison ->
+                            reportOn(result.source, ICDiagnostics.KIC_POISON_FUNCTION_TYPE)
 
                         else -> {}
                     }
@@ -745,23 +923,22 @@ internal class PermissionChecker(
         callableReferenceAccess: FirCallableReferenceAccess,
         data: Context
     ): Nothing? = analyze(callableReferenceAccess, data) {
-        callableReferenceAccess.replaceConeTypeOrNull(
-            context(reporter) {
-                resolveService.resolveCallableReferenceType(
-                    callableReferenceAccess.resolvedType,
-                    callableReferenceAccess.calleeReference,
-                    callableReferenceAccess.dispatchReceiver
-                )
-            }
-        )
+        context(dContext, reporter) {
+            resolveService.resolveCallableReferenceType(
+                callableReferenceAccess.resolvedType,
+                callableReferenceAccess.calleeReference,
+                callableReferenceAccess.dispatchReceiver
+            )
+        }?.let { callableReferenceAccess.replaceConeTypeOrNull(it) }
     }
 
     override fun visitSamConversionExpression(
         samConversionExpression: FirSamConversionExpression,
         data: Context
     ): Nothing? = analyze(samConversionExpression, data) {
-        val samFunctionType = context(reporter) {
-            resolveService.resolveSamFunctionType(samConversionExpression.resolvedType) ?: return@analyze
+        val samFunctionType = context(dContext, reporter) {
+            resolveService.resolveSamFunctionType(samConversionExpression.resolvedType, samConversionExpression.source)
+                ?: return@analyze
         }
         val expression = samConversionExpression.expression
         context(reporter) {
@@ -777,22 +954,15 @@ internal class PermissionChecker(
                 samConversionExpression.source,
                 expression.resolvedType,
                 expression.source,
+                null,
                 null
             )
         }
         when (result) {
-            is FunctionTypeCheckResult.Leak -> context(dContext) {
-                reporter.reportOn(
-                    samConversionExpression.source,
-                    ICDiagnostics.KIC_LEAKY_ASSIGNMENT,
-                    result.leakedPermissions
-                )
-            }
+            is FunctionTypeCheckResult.Leak ->
+                reportOn(samConversionExpression.source, ICDiagnostics.KIC_LEAKY_ASSIGNMENT, result.leakedPermissions)
 
-            is FunctionTypeCheckResult.Poison -> context(dContext) {
-                reporter.reportOn(result.source, ICDiagnostics.KIC_POISON_FUNCTION_TYPE)
-            }
-
+            is FunctionTypeCheckResult.Poison -> reportOn(result.source, ICDiagnostics.KIC_POISON_FUNCTION_TYPE)
             else -> {}
         }
     }
@@ -806,9 +976,7 @@ internal class PermissionChecker(
                     if (
                         annotationCall.findArgumentByName(ICNames.ARG_PERMISSIONS)?.unwrapVarargValue().isNullOrEmpty()
                     ) {
-                        context(dContext) {
-                            reporter.reportOn(annotationCall.source, ICDiagnostics.KIC_EMPTY_ANNOTATION)
-                        }
+                        reportOn(annotationCall.source, ICDiagnostics.KIC_EMPTY_ANNOTATION)
                     }
                 }
             }

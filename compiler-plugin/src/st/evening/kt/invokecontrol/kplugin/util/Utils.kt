@@ -2,8 +2,10 @@ package st.evening.kt.invokecontrol.kplugin.util
 
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.declarations.FirFunction
 import org.jetbrains.kotlin.fir.declarations.evaluateAs
 import org.jetbrains.kotlin.fir.declarations.findArgumentByName
+import org.jetbrains.kotlin.fir.declarations.toAnnotationClassIdSafe
 import org.jetbrains.kotlin.fir.declarations.unwrapVarargValue
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation
 import org.jetbrains.kotlin.fir.symbols.ConeTypeParameterLookupTag
@@ -23,6 +25,14 @@ import org.jetbrains.kotlin.fir.types.ConeTypeParameterType
 import org.jetbrains.kotlin.fir.types.ConeTypeProjection
 import org.jetbrains.kotlin.fir.types.ConeTypeVariableType
 import org.jetbrains.kotlin.name.Name
+import st.evening.kt.invokecontrol.kplugin.ICNames
+
+infix fun <T> Set<T>.setUnion(o: Set<T>): Set<T> = // handles empty sets better than +
+    if (isEmpty()) o else if (o.isEmpty()) this else toMutableSet().also { it.addAll(o) }
+
+fun FirFunction.isDependentPermissionFunction(session: FirSession): Boolean = valueParameters.any { parameter ->
+    parameter.annotations.any { it.toAnnotationClassIdSafe(session) == ICNames.ANNOT_CONSTANT }
+}
 
 inline fun <reified T : FirElement> FirAnnotation.forEachVarargArgument(
     name: Name,

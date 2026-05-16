@@ -93,6 +93,12 @@ public class JvmBoxTestGenerated extends AbstractJvmBoxTest {
   }
 
   @Test
+  @TestMetadata("inferLambda.kt")
+  public void testInferLambda() {
+    runTest("compiler-plugin/testData/box/inferLambda.kt");
+  }
+
+  @Test
   @TestMetadata("innerProperty.kt")
   public void testInnerProperty() {
     runTest("compiler-plugin/testData/box/innerProperty.kt");

@@ -11,8 +11,10 @@ object ICNames {
     )
 
     val PACKAGE: FqName = FqName("st.evening.kt.invokecontrol")
+    val ANNOT_CONSTANT: ClassId = ClassId(PACKAGE, Name.identifier("ICConstant"))
     val ANNOT_RESTRICT: ClassId = ClassId(PACKAGE, Name.identifier("ICRestrict"))
     val ANNOT_RESTRICT_ANNOTATION: ClassId = ClassId(PACKAGE, Name.identifier("ICRestrictAnnotation"))
     val ANNOT_UNCHECKED: ClassId = ClassId(PACKAGE, Name.identifier("ICUnchecked"))
+    val ARG_KEY: Name = Name.identifier("key")
     val ARG_PERMISSIONS: Name = Name.identifier("permissions")
 }

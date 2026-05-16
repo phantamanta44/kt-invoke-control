@@ -34,6 +34,14 @@ public annotation class ICRestrictAnnotation(vararg val permissions: String)
 public annotation class ICRestrict(vararg val permissions: String)
 
 /**
+ * Marks that a string value parameter must be a constant, which allows it to be used as a parameter to restriction
+ * annotations.
+ */
+@Target(AnnotationTarget.VALUE_PARAMETER)
+@Retention(AnnotationRetention.BINARY)
+public annotation class ICConstant(val key: String = "")
+
+/**
  * Instructs the permission checker to ignore the given permissions when checking the annotated expression.
  */
 @Target(AnnotationTarget.EXPRESSION)

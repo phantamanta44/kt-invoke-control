@@ -1,0 +1,63 @@
+FILE: dependent.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(test.${param}))) @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.FUNCTION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class Test : R|kotlin/Annotation| {
+        public constructor(param: R|kotlin/String|): R|foo/bar/Test| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val param: R|[] kotlin/String| = R|<local>/param|
+            public get(): R|kotlin/String|
+
+    }
+    public final fun grantIn(@R|st/evening/kt/invokecontrol/ICConstant|() permission: R|[] kotlin/String|, action: R|@R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(${permission})))  [${permission}] () -> [] kotlin/Unit|): R|kotlin/Unit| {
+        @R|st/evening/kt/invokecontrol/ICUnchecked|(permissions = vararg(String(${permission}))) R|<local>/action|.R|SubstitutionOverride<kotlin/Function0.invoke: R|kotlin/Unit|>|()
+    }
+    public final fun grantTestIn(@R|st/evening/kt/invokecontrol/ICConstant|(key = String(param)) permission: R|[] kotlin/String|, action: R|@R|foo/bar/Test|(param = String(${param}))  [test.${param}] () -> [] kotlin/Unit|): R|kotlin/Unit| {
+        @R|st/evening/kt/invokecontrol/ICUnchecked|(permissions = vararg(String(test.${param}))) R|<local>/action|.R|SubstitutionOverride<kotlin/Function0.invoke: R|kotlin/Unit|>|()
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(${permission}))) public final fun passThrough(@R|st/evening/kt/invokecontrol/ICConstant|() permission: R|[] kotlin/String|, action: R|@R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(${permission})))  [${permission}] () -> [] kotlin/Unit|): R|kotlin/Unit| {
+        R|<local>/action|.R|SubstitutionOverride<kotlin/Function0.invoke: R|kotlin/Unit|>|()
+    }
+    @R|foo/bar/Test|(param = String(${s})) public final fun test(@R|st/evening/kt/invokecontrol/ICConstant|() s: R|[] kotlin/String|): R|kotlin/Unit| {
+        R|foo/bar/grantIn|(R|<local>/s|, <L> = @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(${s}))) grantIn@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            R|foo/bar/passThrough|(R|<local>/s|, <L> = @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(${s}))) passThrough@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+                R|kotlin/io/println|(R|<local>/s|)
+            }
+            )
+        }
+        )
+    }
+    public final fun nop(@R|st/evening/kt/invokecontrol/ICConstant|() s: R|kotlin/String|): R|kotlin/Unit| {
+    }
+    public final const val constant: R|[] kotlin/String| = String(lorem)
+        public get(): R|kotlin/String|
+    public final val property: R|[] kotlin/String| = String(ipsum)
+        public get(): R|kotlin/String|
+    public final fun function(): R|kotlin/String| {
+        ^function String(dolor)
+    }
+    public final fun main(@R|st/evening/kt/invokecontrol/ICConstant|() constantParameter: R|kotlin/String|, parameter: R|kotlin/String|): R|kotlin/Unit| {
+        R|foo/bar/grantIn|(R|foo/bar/constant|, <L> = @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(lorem))) grantIn@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            ^@grantIn Unit
+        }
+        )
+        R|foo/bar/nop|(R|foo/bar/property|)
+        R|foo/bar/nop|(R|foo/bar/function|())
+        R|foo/bar/grantIn|(R|<local>/constantParameter|, <L> = @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(${constantParameter}))) grantIn@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            ^@grantIn Unit
+        }
+        )
+        R|foo/bar/nop|(R|<local>/parameter|)
+        R|foo/bar/grantIn|(String(literal), <L> = @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(literal))) grantIn@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            ^@grantIn Unit
+        }
+        )
+        R|foo/bar/nop|(String(${nothing} to see here))
+        R|foo/bar/grantTestIn|(String(foo), <L> = @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(test.foo))) grantTestIn@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            R|foo/bar/test|(String(foo))
+        }
+        )
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(${foo}))) public final fun bad(@R|st/evening/kt/invokecontrol/ICConstant|(key = String(bar)) foo: R|kotlin/String|): R|kotlin/Unit| {
+    }

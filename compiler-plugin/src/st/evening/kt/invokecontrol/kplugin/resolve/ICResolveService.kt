@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.fir.declarations.FirCallableDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirConstructor
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirFile
+import org.jetbrains.kotlin.fir.declarations.FirFunction
 import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.FirReceiverParameter
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
@@ -64,8 +65,7 @@ import st.evening.kt.invokecontrol.kplugin.ICCommandLineProcessor
 import st.evening.kt.invokecontrol.kplugin.ICDiagnostics
 import st.evening.kt.invokecontrol.kplugin.ICNames
 import st.evening.kt.invokecontrol.kplugin.permission.FunctionTypePermissionsAttribute
-import st.evening.kt.invokecontrol.kplugin.permission.PermissionArgumentProvider
-import st.evening.kt.invokecontrol.kplugin.permission.PermissionFactory
+import st.evening.kt.invokecontrol.kplugin.permission.Permission
 import st.evening.kt.invokecontrol.kplugin.permission.PermissionP
 import st.evening.kt.invokecontrol.kplugin.permission.icDeclarationPermissions
 import st.evening.kt.invokecontrol.kplugin.permission.icFunctionTypePermissions
@@ -78,6 +78,7 @@ import st.evening.kt.invokecontrol.kplugin.util.forEachVarargArgument
 import st.evening.kt.invokecontrol.kplugin.util.force
 import st.evening.kt.invokecontrol.kplugin.util.getFunctionTypeForAbstractMethod
 import st.evening.kt.invokecontrol.kplugin.util.getSingleAbstractMethodOrNull
+import st.evening.kt.invokecontrol.kplugin.util.isDependentPermissionFunction
 import st.evening.kt.invokecontrol.kplugin.util.map
 import st.evening.kt.invokecontrol.kplugin.util.mapType
 import st.evening.kt.invokecontrol.kplugin.util.mapTypeLater
@@ -101,29 +102,29 @@ class ICResolveService(
 
     // Phase 1: resolve restrict annotations
 
-    private val configuredAnnotations: Map<ClassId, List<PermissionFactory>>?
+    private val configuredAnnotations: Map<ClassId, List<Permission>>?
         by lazy { compilerConfig[ICCommandLineProcessor.RESTRICT_ANNOTATIONS] }
 
     context(reporter: DiagnosticReporter)
-    private fun getRestrictAnnotationPermissions(annotationClass: FirRegularClass): List<PermissionFactory> {
+    private fun getRestrictAnnotationPermissions(annotationClass: FirRegularClass): List<Permission> {
         if (annotationClass.classKind != ClassKind.ANNOTATION_CLASS) {
             throw IllegalArgumentException("Not an annotation class: ${annotationClass.name}")
         }
         annotationClass.icRestrictAnnotationPermissions?.let { return it }
-        val factories = mutableListOf<PermissionFactory>()
+        val permissions = mutableListOf<Permission>()
         val metaAnnotation = annotationClass.annotations.find {
             it.toAnnotationClassIdSafe(session) == ICNames.ANNOT_RESTRICT_ANNOTATION
         }
         if (metaAnnotation != null) {
             context(ResolveContext(null)) {
                 metaAnnotation.forEachVarargArgument<FirLiteralExpression>(ICNames.ARG_PERMISSIONS, session) { arg ->
-                    PermissionFactory.fromTemplate(arg.value as String, arg.source)?.let { factories += it }
+                    Permission.fromTemplate(arg.value as String, arg.source)?.let { permissions += it }
                 }
             }
         }
-        configuredAnnotations?.get(annotationClass.classId)?.let { factories.addAll(it) }
-        annotationClass.icRestrictAnnotationPermissions = factories
-        return factories
+        configuredAnnotations?.get(annotationClass.classId)?.let { permissions.addAll(it) }
+        annotationClass.icRestrictAnnotationPermissions = permissions
+        return permissions
     }
 
     // Phase 2: resolve top-level declaration permissions
@@ -132,54 +133,55 @@ class ICResolveService(
 
     @OptIn(SymbolInternals::class)
     context(reporter: DiagnosticReporter)
-    private fun getPermissionsForAnnotation(destination: MutableCollection<String>, annotation: FirAnnotation) {
+    private fun getPermissionsForAnnotation(destination: MutableCollection<Permission>, annotation: FirAnnotation) {
         when (annotation.toAnnotationClassIdSafe(session)) {
             null -> {}
 
             ICNames.ANNOT_RESTRICT -> {
-                annotation.forEachVarargArgument<FirLiteralExpression>(ICNames.ARG_PERMISSIONS, session) {
-                    destination += it.value as String
+                context(ResolveContext(null)) { // TODO find containing file
+                    annotation.forEachVarargArgument<FirLiteralExpression>(ICNames.ARG_PERMISSIONS, session) { arg ->
+                        Permission.fromTemplate(arg.value as String, arg.source)?.let {
+                            destination += it
+                        }
+                    }
                 }
             }
 
             else -> {
                 val symbol = annotation.toAnnotationClassLikeSymbol(session)!!
+                val substitution = Permission.Substitution { key, source ->
+                    val argument = annotation.findArgumentByName(Name.identifier(key)) ?: run {
+                        reporter.reportOn(source, ICDiagnostics.KIC_NO_SUCH_PERMISSION_ARGUMENT, key)
+                        return@Substitution null
+                    }
+                    val asLiteral = argument.evaluateAs<FirLiteralExpression>(session)
+                    if (asLiteral != null) {
+                        return@Substitution Permission.parseTemplate(
+                            (asLiteral.value ?: return@Substitution null).toString(),
+                            argument.source
+                        )
+                    }
+                    val asEnum = argument.extractEnumValueArgumentInfo()
+                    if (asEnum != null) {
+                        return@Substitution listOf(Permission.Segment.Literal(asEnum.enumEntryName.asString()))
+                    }
+                    reporter.reportOn(source, ICDiagnostics.KIC_INVALID_PERMISSION_ARGUMENT_VALUE, key)
+                    return@Substitution null
+                }
                 context(ResolveContext(null)) {
-                    val argumentProvider = AnnotationArgumentProvider(annotation)
                     getRestrictAnnotationPermissions(symbol.fir as FirRegularClass).mapNotNullTo(destination) {
-                        it.build(argumentProvider)
+                        it.substitute(substitution)
                     }
                 }
             }
         }
     }
 
-    private inner class AnnotationArgumentProvider(private val annotation: FirAnnotation) : PermissionArgumentProvider {
-        // this could be memoized, but it's unlikely that a single argument will be used more than once
-        context(context: DiagnosticContext, reporter: DiagnosticReporter)
-        override fun get(key: String, useSite: AbstractKtSourceElement?): String? {
-            val argument = annotation.findArgumentByName(Name.identifier(key)) ?: run {
-                reporter.reportOn(useSite, ICDiagnostics.KIC_NO_SUCH_PERMISSION_ARGUMENT, key)
-                return null
-            }
-            val asLiteral = argument.evaluateAs<FirLiteralExpression>(session)
-            if (asLiteral != null) {
-                return asLiteral.value.toString()
-            }
-            val asEnum = argument.extractEnumValueArgumentInfo()
-            if (asEnum != null) {
-                return asEnum.enumEntryName.asString()
-            }
-            reporter.reportOn(useSite, ICDiagnostics.KIC_INVALID_PERMISSION_ARGUMENT_VALUE, key)
-            return null
-        }
-    }
-
     @OptIn(SymbolInternals::class)
     context(reporter: DiagnosticReporter)
-    fun getDeclarationAnnotatedPermissions(declaration: FirDeclaration): Set<String> {
+    fun getDeclarationAnnotatedPermissions(declaration: FirDeclaration): Set<Permission> {
         declaration.icDeclarationPermissions?.let { return it }
-        val permissions = mutableSetOf<String>()
+        val permissions = mutableSetOf<Permission>()
         declaration.annotations.forEach { getPermissionsForAnnotation(permissions, it) }
         if (declaration is FirConstructor) {
             val ownerTypeRef = declaration.returnTypeRef
@@ -200,7 +202,7 @@ class ICResolveService(
     ): Later<ConeKotlinType> = context(session.typeContext) {
         type.transformLeaves(state) { leaf ->
             if (leaf !is ConeClassLikeType) return@transformLeaves Later.Now(leaf)
-            val permissions = mutableSetOf<String>()
+            val permissions = mutableSetOf<Permission>()
             leaf.typeAnnotations.forEach { getPermissionsForAnnotation(permissions, it) }
             return@transformLeaves leaf.typeArguments.traverseLater { argument ->
                 argument.mapTypeLater { transformAnnotatedTypesLater(it, state) }
@@ -263,7 +265,7 @@ class ICResolveService(
     fun resolveCallable(
         callableReference: FirNamedReference,
         dispatchReceiver: FirExpression?
-    ): Pair<String, Set<String>?> {
+    ): Pair<String, Set<Permission>?> {
         if (dispatchReceiver != null) {
             if (dispatchReceiver.resolvedType.isSomeFunctionType(session)) { // TODO check that it's actually invoke()
                 val permissions = when (val p = resolveReturnTypePermissions(dispatchReceiver)) {
@@ -284,12 +286,12 @@ class ICResolveService(
     }
 
     @OptIn(SymbolInternals::class)
-    context(reporter: DiagnosticReporter)
+    context(context: DiagnosticContext, reporter: DiagnosticReporter)
     fun resolveCallableReferenceType(
         type: ConeKotlinType,
         callableReference: FirNamedReference,
         dispatchReceiver: FirExpression?
-    ): ConeKotlinType {
+    ): ConeKotlinType? {
         if (dispatchReceiver != null) {
             if (dispatchReceiver.resolvedType.isSomeFunctionType(session)) { // TODO check that it's actually invoke()
                 resolveReturnTypePermissions(dispatchReceiver)
@@ -297,8 +299,14 @@ class ICResolveService(
                 return dispatchReceiver.resolvedType
             }
         }
+        val permissions = callableReference.resolved?.resolvedSymbol?.fir?.let {
+            if (it is FirFunction && it.isDependentPermissionFunction(session)) {
+                reporter.reportOn(callableReference.source, ICDiagnostics.KIC_UNSUPPORTED_DEPENDENT_FUNCTION)
+                return null
+            }
+            getDeclarationAnnotatedPermissions(it)
+        }
         val newType = transformAnnotatedTypes(type)
-        val permissions = callableReference.resolved?.resolvedSymbol?.let { getDeclarationAnnotatedPermissions(it.fir) }
         return if (permissions == null) newType else {
             newType.withAttributes(
                 newType.attributes.add(FunctionTypePermissionsAttribute(PermissionP.of(permissions)))
@@ -333,13 +341,17 @@ class ICResolveService(
     }
 
     @OptIn(SymbolInternals::class)
-    context(reporter: DiagnosticReporter)
-    fun resolveSamFunctionType(samType: ConeKotlinType): ConeKotlinType? {
+    context(context: DiagnosticContext, reporter: DiagnosticReporter)
+    fun resolveSamFunctionType(samType: ConeKotlinType, referenceSource: AbstractKtSourceElement?): ConeKotlinType? {
         when (samType) {
             is ConeClassLikeType -> {
                 val samClass = samType.fullyExpandedType().lookupTag.toRegularClassSymbol()?.fir
                     ?: return null
                 val (samMethod, unsubstitutedFunctionType) = getSamMethod(samClass) ?: return null
+                if (samMethod.isDependentPermissionFunction(session)) {
+                    reporter.reportOn(referenceSource, ICDiagnostics.KIC_UNSUPPORTED_DEPENDENT_FUNCTION)
+                    return null
+                }
                 val rawFunctionType = samClass.buildSubstitutorWithUpperBounds(samType)
                     .substituteOrNull(unsubstitutedFunctionType) ?: unsubstitutedFunctionType
                 val functionType = transformAnnotatedTypes(
@@ -353,11 +365,11 @@ class ICResolveService(
             }
 
             is ConeFlexibleType -> {
-                val lowerType = resolveSamFunctionType(samType.lowerBound) ?: return null
+                val lowerType = resolveSamFunctionType(samType.lowerBound, referenceSource) ?: return null
                 if (samType.isTrivial) {
                     return lowerType.lowerBoundIfFlexible().toTrivialFlexibleType(session.typeContext)
                 } else {
-                    val upperType = resolveSamFunctionType(samType.upperBound) ?: return null
+                    val upperType = resolveSamFunctionType(samType.upperBound, referenceSource) ?: return null
                     return ConeFlexibleType(
                         lowerType.lowerBoundIfFlexible(),
                         upperType.upperBoundIfFlexible(),
@@ -366,7 +378,10 @@ class ICResolveService(
                 }
             }
 
-            is ConeCapturedType -> return samType.constructor.lowerType?.let { resolveSamFunctionType(it) }
+            is ConeCapturedType -> return samType.constructor.lowerType?.let {
+                resolveSamFunctionType(it, referenceSource)
+            }
+
             else -> return null
         }
     }

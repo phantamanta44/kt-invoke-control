@@ -16,11 +16,11 @@ object ICAttributes {
     object SamFunctionType : FirDeclarationDataKey()
 }
 
-var FirDeclaration.icRestrictAnnotationPermissions: List<PermissionFactory>?
+var FirDeclaration.icRestrictAnnotationPermissions: List<Permission>?
     by FirDeclarationDataRegistry.data(ICAttributes.RestrictAnnotationPermissions)
     internal set
 
-var FirDeclaration.icDeclarationPermissions: Set<String>?
+var FirDeclaration.icDeclarationPermissions: Set<Permission>?
     by FirDeclarationDataRegistry.data(ICAttributes.DeclarationPermissions)
     internal set
 
@@ -65,12 +65,12 @@ sealed interface PermissionP {
     companion object {
         val EMPTY: PermissionP = Some(emptySet())
 
-        fun of(permissions: Set<String>): PermissionP = if (permissions.isEmpty()) EMPTY else Some(permissions)
+        fun of(permissions: Set<Permission>): PermissionP = if (permissions.isEmpty()) EMPTY else Some(permissions)
     }
 
     operator fun plus(other: PermissionP): PermissionP
 
-    data class Some(val permissions: Set<String>) : PermissionP {
+    data class Some(val permissions: Set<Permission>) : PermissionP {
         override fun plus(other: PermissionP): PermissionP = when (other) {
             is Some -> Some(permissions + other.permissions)
             is Poison -> Poison

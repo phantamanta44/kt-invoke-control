@@ -51,6 +51,12 @@ public class JvmDiagnosticTestGenerated extends AbstractJvmDiagnosticTest {
   }
 
   @Test
+  @TestMetadata("dependent.kt")
+  public void testDependent() {
+    runTest("compiler-plugin/testData/diagnostics/dependent.kt");
+  }
+
+  @Test
   @TestMetadata("empty.kt")
   public void testEmpty() {
     runTest("compiler-plugin/testData/diagnostics/empty.kt");
