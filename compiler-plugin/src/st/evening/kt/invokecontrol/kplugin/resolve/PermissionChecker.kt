@@ -30,6 +30,8 @@ import org.jetbrains.kotlin.fir.declarations.getStringArgument
 import org.jetbrains.kotlin.fir.declarations.toAnnotationClassIdSafe
 import org.jetbrains.kotlin.fir.declarations.unwrapVarargValue
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
+import org.jetbrains.kotlin.fir.expressions.FirAnonymousFunctionExpression
+import org.jetbrains.kotlin.fir.expressions.FirArgumentList
 import org.jetbrains.kotlin.fir.expressions.FirCall
 import org.jetbrains.kotlin.fir.expressions.FirCallableReferenceAccess
 import org.jetbrains.kotlin.fir.expressions.FirContextArgumentListOwner
@@ -106,6 +108,7 @@ import st.evening.kt.invokecontrol.kplugin.permission.Permission
 import st.evening.kt.invokecontrol.kplugin.permission.PermissionP
 import st.evening.kt.invokecontrol.kplugin.permission.PermissionSet
 import st.evening.kt.invokecontrol.kplugin.permission.icFunctionTypePermissions
+import st.evening.kt.invokecontrol.kplugin.permission.substitute
 import st.evening.kt.invokecontrol.kplugin.permission.substituteOrSelf
 import st.evening.kt.invokecontrol.kplugin.util.forEachVarargArgument
 import st.evening.kt.invokecontrol.kplugin.util.setUnion
@@ -116,8 +119,17 @@ internal class PermissionChecker(
     private val dContext: DiagnosticContext,
     private val reporter: DiagnosticReporter
 ) : FirDefaultVisitor<Nothing?, PermissionChecker.Context>(), SessionAndScopeSessionHolder by resolveService {
-    class Context(val permissions: Set<Permission>, val scope: Set<String>) {
-        constructor() : this(emptySet(), emptySet())
+    sealed interface ParentInfo {
+        class FunctionCall(val callee: FirFunction, val substitution: Permission.Substitution) : ParentInfo
+        class FunctionArgument(val permissions: Set<Permission>) : ParentInfo
+    }
+
+    class Context(val permissions: Set<Permission>, val scope: Set<String>, val parentInfo: ParentInfo?) {
+        constructor() : this(emptySet(), emptySet(), null)
+
+        fun withParentInfo(newParentInfo: ParentInfo): Context = Context(permissions, scope, newParentInfo)
+
+        fun withoutParentInfo(): Context = if (parentInfo == null) this else Context(permissions, scope, null)
     }
 
     private fun reportOn(source: AbstractKtSourceElement?, factory: KtDiagnosticFactory0) {
@@ -157,7 +169,7 @@ internal class PermissionChecker(
     }
 
     override fun visitElement(element: FirElement, data: Context): Nothing? {
-        element.acceptChildren(this, data)
+        element.acceptChildren(this, data.withoutParentInfo())
         return null
     }
 
@@ -216,7 +228,7 @@ internal class PermissionChecker(
         val localPermissions = context(dContext, reporter) {
             resolveService.getDeclarationAnnotatedPermissions(declaration)
         }.checkWellScoped(subScope)
-        val subContext = Context(parentContext.permissions setUnion localPermissions, subScope)
+        val subContext = Context(parentContext.permissions setUnion localPermissions, subScope, null)
         withErrorHandling(declaration.source) {
             check(subContext)
         }
@@ -586,6 +598,7 @@ internal class PermissionChecker(
         valueArguments: List<FirExpression>,
         context: Context
     ): Permission.Substitution? {
+        if (valueParameters.size != valueArguments.size) return null
         val permissionArguments = mutableMapOf<String, List<Permission.Segment>>() // TODO check for name clashes?
         valueParameters.forEachIndexed { index, parameter ->
             val key = parameter.getKeyForConstant() ?: return@forEachIndexed
@@ -662,11 +675,11 @@ internal class PermissionChecker(
     }
 
     @OptIn(SymbolInternals::class)
-    private fun <E> checkAccessExpression(expression: E, context: Context) where E : FirExpression, E : FirResolvable {
+    private fun <E> checkAccessExpression(expression: E, context: Context, permissionSubst: Permission.Substitution?)
+        where E : FirExpression, E : FirResolvable {
         val calleeReference = expression.calleeReference as? FirNamedReference ?: return
         if (calleeReference !is FirResolvedNamedReference) return
         val callee = calleeReference.resolvedSymbol.fir as FirCallableDeclaration
-        val permissionSubst: Permission.Substitution?
 
         // check argument types
         context(session.typeContext) {
@@ -676,13 +689,10 @@ internal class PermissionChecker(
             if (callee is FirFunction) {
                 val valueParameters = callee.valueParameters
                 val valueArguments = (expression as FirCall).arguments
-                if (valueParameters.size != valueArguments.size) return
-                permissionSubst = buildPermissionSubstitution(valueParameters, valueArguments, context) ?: return
+                if (valueParameters.size != valueArguments.size) return // slightly redundant for normal functions because this is also checked while computing the permission substitution
                 valueParameters.forEachIndexed { index, parameter ->
                     checkAssignment(parameter, valueArguments[index], typeSubst, permissionSubst)
                 }
-            } else {
-                permissionSubst = null
             }
 
             if (qaeExpression != null) {
@@ -823,7 +833,7 @@ internal class PermissionChecker(
         }
 
     override fun visitAnonymousFunction(anonymousFunction: FirAnonymousFunction, data: Context): Nothing? =
-        extendAndCheck(anonymousFunction, data) { // TODO infer local permissions from lambda use site?
+        extendAndCheck(anonymousFunction, data) {
             context(reporter) {
                 resolveService.resolveLambda(anonymousFunction)
             }
@@ -840,10 +850,25 @@ internal class PermissionChecker(
 
     // Expressions
 
-    override fun visitFunctionCall(functionCall: FirFunctionCall, data: Context): Nothing? =
-        analyze(functionCall, data) {
-            checkAccessExpression(functionCall, data)
+    @OptIn(SymbolInternals::class)
+    override fun visitFunctionCall(functionCall: FirFunctionCall, data: Context): Nothing? {
+        val calleeReference = functionCall.calleeReference
+        if (calleeReference is FirResolvedNamedReference) {
+            val callee = calleeReference.resolvedSymbol.fir as FirFunction
+            val substitution = buildPermissionSubstitution(callee.valueParameters, functionCall.arguments, data)
+            val subContext = substitution?.let { data.withParentInfo(ParentInfo.FunctionCall(callee, it)) }
+                ?: data.withoutParentInfo()
+            functionCall.acceptChildren(this, subContext)
+            withErrorHandling(functionCall.source) {
+                checkAccessExpression(functionCall, subContext, substitution)
+            }
+        } else {
+            analyze(functionCall, data) {
+                checkAccessExpression(functionCall, data, null)
+            }
         }
+        return null
+    }
 
     override fun visitDelegatedConstructorCall(
         delegatedConstructorCall: FirDelegatedConstructorCall,
@@ -854,7 +879,7 @@ internal class PermissionChecker(
             calleeReference is FirResolvedNamedReference &&
             (calleeReference.resolvedSymbol as FirConstructorSymbol).callableId != ICNames.ENUM_CONSTRUCTOR
         ) {
-            checkAccessExpression(delegatedConstructorCall, data)
+            checkAccessExpression(delegatedConstructorCall, data, null)
         }
     }
 
@@ -862,7 +887,7 @@ internal class PermissionChecker(
         propertyAccessExpression: FirPropertyAccessExpression,
         data: Context
     ): Nothing? = analyze(propertyAccessExpression, data) {
-        checkAccessExpression(propertyAccessExpression, data)
+        checkAccessExpression(propertyAccessExpression, data, null)
     }
 
     @OptIn(SymbolInternals::class)
@@ -932,6 +957,21 @@ internal class PermissionChecker(
         }?.let { callableReferenceAccess.replaceConeTypeOrNull(it) }
     }
 
+    override fun visitAnonymousFunctionExpression(
+        anonymousFunctionExpression: FirAnonymousFunctionExpression,
+        data: Context
+    ): Nothing? {
+        val parentInfo = data.parentInfo
+        if (parentInfo is ParentInfo.FunctionArgument) {
+            anonymousFunctionExpression.acceptChildren(
+                this, Context(parentInfo.permissions + data.permissions, data.scope, null)
+            )
+        } else {
+            visitElement(anonymousFunctionExpression, data)
+        }
+        return null
+    }
+
     override fun visitSamConversionExpression(
         samConversionExpression: FirSamConversionExpression,
         data: Context
@@ -968,6 +1008,30 @@ internal class PermissionChecker(
     }
 
     // Other checks
+
+    override fun visitArgumentList(argumentList: FirArgumentList, data: Context): Nothing? {
+        val parentInfo = data.parentInfo
+        if (parentInfo !is ParentInfo.FunctionCall) {
+            visitElement(argumentList, data)
+            return null
+        }
+        val parameters = parentInfo.callee.valueParameters
+        val substitution = parentInfo.substitution
+        context(dContext, session.typeContext) {
+            argumentList.arguments.forEachIndexed { index, argument ->
+                val permissions = context(reporter) {
+                    resolveService.resolveReturnTypePermissions(parameters[index])
+                }
+                if (permissions is PermissionP.Some) {
+                    val subInfo = ParentInfo.FunctionArgument(permissions.permissions.substitute(substitution))
+                    argument.accept(this, data.withParentInfo(subInfo))
+                } else {
+                    argument.accept(this, data)
+                }
+            }
+        }
+        return null
+    }
 
     override fun visitAnnotationCall(annotationCall: FirAnnotationCall, data: Context): Nothing? =
         analyze(annotationCall, data) {

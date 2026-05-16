@@ -28,7 +28,7 @@ FILE: dependent.kt
         }
         )
     }
-    public final fun nop(@R|st/evening/kt/invokecontrol/ICConstant|() s: R|kotlin/String|): R|kotlin/Unit| {
+    public final fun nop(@R|st/evening/kt/invokecontrol/ICConstant|() s: R|[] kotlin/String|): R|kotlin/Unit| {
     }
     public final const val constant: R|[] kotlin/String| = String(lorem)
         public get(): R|kotlin/String|
