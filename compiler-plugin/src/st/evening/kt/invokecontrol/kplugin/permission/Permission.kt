@@ -9,7 +9,7 @@ import st.evening.kt.invokecontrol.kplugin.ICDiagnostics
 
 class Permission private constructor(val segments: List<Segment>, val source: AbstractKtSourceElement?) {
     companion object {
-        private val ARG_TEMPLATE_PATTERN: Regex = Regex("""\$\{([^}]*)}""", RegexOption.IGNORE_CASE)
+        private val ARG_TEMPLATE_PATTERN: Regex = Regex("""!\{([^}]*)}""", RegexOption.IGNORE_CASE)
 
         context(context: DiagnosticContext, reporter: DiagnosticReporter)
         fun fromTemplate(templateString: String, templateSource: AbstractKtSourceElement?): Permission? =
@@ -107,7 +107,7 @@ class Permission private constructor(val segments: List<Segment>, val source: Ab
 
     sealed interface Segment {
         data class Variable(val key: String) : Segment {
-            override fun toString(): String = $$"${$$key}"
+            override fun toString(): String = "!{$key}"
         }
 
         data class Literal(val value: String) : Segment {

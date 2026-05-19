@@ -13,8 +13,8 @@ fun runEnclave(f: @Enclave () -> String): String {
     return (@ICUnchecked("enclave") f())
 }
 
-fun runDependent(@ICConstant permission: String, f: @ICRestrict($$"${permission}") () -> String): String {
-    return (@ICUnchecked($$"${permission}") f())
+fun runDependent(@ICConstant permission: String, f: @ICRestrict("!{permission}") () -> String): String {
+    return (@ICUnchecked("!{permission}") f())
 }
 
 @Enclave

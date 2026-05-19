@@ -8,7 +8,7 @@ package st.evening.kt.invokecontrol
  * permissions. An anonymous function may be annotated to restrict its type, thus granting the permissions within the
  * scope of the function body.
  *
- * Simple string interpolation of annotation arguments is supported using the `${paramName}` syntax.
+ * Simple string interpolation of annotation arguments is supported using the `!{paramName}` syntax.
  */
 @Target(AnnotationTarget.ANNOTATION_CLASS)
 @Retention(AnnotationRetention.BINARY)

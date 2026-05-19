@@ -8,7 +8,7 @@ enum class Spin {
     UP, DOWN
 }
 
-@ICRestrictAnnotation($$"spin.${value}")
+@ICRestrictAnnotation("spin.!{value}")
 annotation class Enclave(val value: Spin)
 
 fun box(): String {

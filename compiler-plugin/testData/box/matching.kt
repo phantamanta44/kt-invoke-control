@@ -4,7 +4,7 @@ import st.evening.kt.invokecontrol.ICRestrict
 import st.evening.kt.invokecontrol.ICRestrictAnnotation
 import st.evening.kt.invokecontrol.ICUnchecked
 
-@ICRestrictAnnotation($$"p${first}${second}n")
+@ICRestrictAnnotation("p!{first}!{second}n")
 annotation class Enclave(val first: String, val second: String)
 
 fun box(): String {
