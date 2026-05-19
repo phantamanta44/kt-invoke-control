@@ -629,16 +629,9 @@ internal class PermissionChecker(
                                 reportOn(argument.source, ICDiagnostics.KIC_NOT_CONSTANT)
                                 return null
                             }
-                            val value = literal.value
-                            if (value !is String) {
-                                reportOn(
-                                    argument.source,
-                                    ICDiagnostics.KIC_INVALID_PERMISSION_ARGUMENT_VALUE,
-                                    value.toString()
-                                )
-                                return null
-                            }
-                            permissionArguments[key] = listOf(Permission.Segment.Literal(value))
+                            permissionArguments[key] = listOf(
+                                Permission.Segment.Literal((literal.value ?: return@forEachIndexed).toString())
+                            )
                         }
 
                         is FirValueParameter -> {
