@@ -113,6 +113,9 @@ import st.evening.kt.invokecontrol.kplugin.permission.substituteOrSelf
 import st.evening.kt.invokecontrol.kplugin.util.forEachVarargArgument
 import st.evening.kt.invokecontrol.kplugin.util.setUnion
 import st.evening.kt.invokecontrol.kplugin.util.unwrapClassType
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 
 internal class PermissionChecker(
     private val resolveService: ICResolveService,
@@ -124,12 +127,19 @@ internal class PermissionChecker(
         class FunctionArgument(val permissions: Set<Permission>) : ParentInfo
     }
 
-    class Context(val permissions: Set<Permission>, val scope: Set<String>, val parentInfo: ParentInfo?) {
-        constructor() : this(emptySet(), emptySet(), null)
+    class Context(
+        val localPermissions: Set<Permission>,
+        val permissions: Set<Permission>,
+        val scope: Set<String>,
+        val parentInfo: ParentInfo?
+    ) {
+        constructor() : this(emptySet(), emptySet(), emptySet(), null)
 
-        fun withParentInfo(newParentInfo: ParentInfo): Context = Context(permissions, scope, newParentInfo)
+        fun withParentInfo(newParentInfo: ParentInfo): Context =
+            Context(localPermissions, permissions, scope, newParentInfo)
 
-        fun withoutParentInfo(): Context = if (parentInfo == null) this else Context(permissions, scope, null)
+        fun withoutParentInfo(): Context =
+            if (parentInfo == null) this else Context(localPermissions, permissions, scope, null)
     }
 
     private fun reportOn(source: AbstractKtSourceElement?, factory: KtDiagnosticFactory0) {
@@ -150,7 +160,11 @@ internal class PermissionChecker(
         }
     }
 
+    @OptIn(ExperimentalContracts::class)
     private inline fun withErrorHandling(source: KtSourceElement?, action: () -> Unit) {
+        contract {
+            callsInPlace(action, InvocationKind.EXACTLY_ONCE)
+        }
         try {
             action()
         } catch (e: Exception) {
@@ -215,11 +229,15 @@ internal class PermissionChecker(
         return wellScoped
     }
 
+    @OptIn(ExperimentalContracts::class)
     private inline fun extendAndCheck(
         declaration: FirDeclaration,
         parentContext: Context,
         check: (Context) -> Unit
     ): Nothing? {
+        contract {
+            callsInPlace(check, InvocationKind.EXACTLY_ONCE)
+        }
         val subScope = (declaration as? FirFunction)?.let { function ->
             parentContext.scope setUnion function.valueParameters.mapNotNullTo(mutableSetOf()) {
                 it.getKeyForConstant()
@@ -228,7 +246,7 @@ internal class PermissionChecker(
         val localPermissions = context(dContext, reporter) {
             resolveService.getDeclarationAnnotatedPermissions(declaration)
         }.checkWellScoped(subScope)
-        val subContext = Context(parentContext.permissions setUnion localPermissions, subScope, null)
+        val subContext = Context(localPermissions, parentContext.permissions setUnion localPermissions, subScope, null)
         withErrorHandling(declaration.source) {
             check(subContext)
         }
@@ -236,13 +254,13 @@ internal class PermissionChecker(
         return null
     }
 
-    private fun checkReferencedTypePermissions(
+    private fun checkLeakyPermissions(
         source: AbstractKtSourceElement?,
-        context: Context,
+        availablePermissions: Set<Permission>,
         requiredPermissions: PermissionSet
     ) {
         if (requiredPermissions.isEmpty()) return
-        val missingPermissions = requiredPermissions - context.permissions
+        val missingPermissions = requiredPermissions - availablePermissions
         if (missingPermissions.isEmpty()) return
         reportOn(
             source,
@@ -250,6 +268,20 @@ internal class PermissionChecker(
             missingPermissions.getPermissions(),
             missingPermissions.getProvenance()
         )
+    }
+
+    @OptIn(ExperimentalContracts::class)
+    private inline fun checkLeakyPermissions(
+        source: AbstractKtSourceElement?,
+        availablePermissions: Set<Permission>,
+        builderAction: (PermissionSet.Builder) -> Unit
+    ) {
+        contract {
+            callsInPlace(builderAction, InvocationKind.EXACTLY_ONCE)
+        }
+        checkLeakyPermissions(source, availablePermissions, PermissionSet.build { builder ->
+            builderAction(builder)
+        })
     }
 
     @OptIn(SymbolInternals::class)
@@ -315,22 +347,20 @@ internal class PermissionChecker(
         }
     }
 
-    private inline fun checkReferencedTypePermissions(
-        source: AbstractKtSourceElement?,
-        context: Context,
-        builderAction: (PermissionSet.Builder) -> Unit
-    ) {
-        checkReferencedTypePermissions(source, context, PermissionSet.build { builder ->
-            builderAction(builder)
-        })
-    }
-
+    @OptIn(ExperimentalContracts::class)
     private inline fun extendAndCheckReferencedTypePermissions(
         declaration: FirDeclaration,
         parentContext: Context,
-        builderAction: (PermissionSet.Builder) -> Unit
-    ): Nothing? = extendAndCheck(declaration, parentContext) { context ->
-        checkReferencedTypePermissions(declaration.source, context, builderAction)
+        builderAction: (Context, PermissionSet.Builder) -> Unit
+    ): Nothing? {
+        contract {
+            callsInPlace(builderAction, InvocationKind.EXACTLY_ONCE)
+        }
+        return extendAndCheck(declaration, parentContext) { context ->
+            checkLeakyPermissions(declaration.source, context.permissions) { builder ->
+                builderAction(context, builder)
+            }
+        }
     }
 
     private fun substitute(
@@ -731,18 +761,18 @@ internal class PermissionChecker(
     override fun visitFile(file: FirFile, data: Context): Nothing? = extendAndCheck(file, data) {}
 
     override fun visitRegularClass(regularClass: FirRegularClass, data: Context): Nothing? =
-        extendAndCheckReferencedTypePermissions(regularClass, data) { builder ->
+        extendAndCheckReferencedTypePermissions(regularClass, data) { _, builder ->
             regularClass.superTypeRefs.forEach { builder.addFromType(it) }
         }
 
     override fun visitTypeAlias(typeAlias: FirTypeAlias, data: Context): Nothing? =
-        extendAndCheckReferencedTypePermissions(typeAlias, data) { builder ->
+        extendAndCheckReferencedTypePermissions(typeAlias, data) { _, builder ->
             builder.addFromType(typeAlias.expandedTypeRef)
         }
 
     @OptIn(SymbolInternals::class, ScopeFunctionRequiresPrewarm::class)
     override fun visitProperty(property: FirProperty, data: Context): Nothing? {
-        extendAndCheckReferencedTypePermissions(property, data) { builder ->
+        extendAndCheckReferencedTypePermissions(property, data) { context, builder ->
             builder.addFromType(property.returnTypeRef)
             property.receiverParameter?.let { builder.addFromType(it.typeRef) }
             property.contextParameters.forEach {
@@ -753,13 +783,22 @@ internal class PermissionChecker(
                 val scope = containingClassSymbol.fir.unsubstitutedScope(
                     session, resolveService.scopeSession, true, FirResolvePhase.ANNOTATION_ARGUMENTS
                 )
-                scope.processPropertiesByName(property.name) {}
-                scope.getDirectOverriddenProperties(property.symbol, true).forEach {
-                    builder.addAll(
-                        context(reporter) {
+                val name = property.name
+                scope.processPropertiesByName(name) {}
+                val superProperties = scope.getDirectOverriddenProperties(property.symbol, true)
+                if (superProperties.isNotEmpty()) {
+                    val superPermissions = mutableSetOf<Permission>()
+                    superProperties.forEach {
+                        val permissions = context(reporter) {
                             resolveService.getDeclarationAnnotatedPermissions(it.fir)
-                        },
-                        it.name.asStringStripSpecialMarkers()
+                        }
+                        builder.addAll(permissions, it.name.asStringStripSpecialMarkers())
+                        superPermissions.addAll(permissions)
+                    }
+                    checkLeakyPermissions(
+                        property.source,
+                        superPermissions,
+                        PermissionSet.fromPermissions(context.localPermissions, name.asStringStripSpecialMarkers())
                     )
                 }
             }
@@ -776,7 +815,7 @@ internal class PermissionChecker(
 
     @OptIn(SymbolInternals::class, ScopeFunctionRequiresPrewarm::class)
     override fun visitNamedFunction(namedFunction: FirNamedFunction, data: Context): Nothing? =
-        extendAndCheckReferencedTypePermissions(namedFunction, data) { builder ->
+        extendAndCheckReferencedTypePermissions(namedFunction, data) { context, builder ->
             builder.addFromType(namedFunction.returnTypeRef)
             namedFunction.valueParameters.forEach {
                 builder.addFromType(it.returnTypeRef)
@@ -791,32 +830,41 @@ internal class PermissionChecker(
                 val scope = containingClassSymbol.fir.unsubstitutedScope(
                     session, resolveService.scopeSession, true, FirResolvePhase.ANNOTATION_ARGUMENTS
                 )
-                scope.processFunctionsByName(namedFunction.name) {}
-                scope.getDirectOverriddenFunctions(namedFunction.symbol, true).forEach { superFunctionSymbol ->
-                    val superFunction = superFunctionSymbol.fir
-                    builder.addAll(
-                        context(reporter) {
+                val name = namedFunction.name
+                scope.processFunctionsByName(name) {}
+                val superFunctions = scope.getDirectOverriddenFunctions(namedFunction.symbol, true)
+                if (superFunctions.isNotEmpty()) {
+                    val superPermissions = mutableSetOf<Permission>()
+                    superFunctions.forEach { superFunctionSymbol ->
+                        val superFunction = superFunctionSymbol.fir
+                        val permissions = context(reporter) {
                             resolveService.getDeclarationAnnotatedPermissions(superFunction)
-                        },
-                        superFunctionSymbol.name.asStringStripSpecialMarkers()
-                    )
-                    superFunction.valueParameters.forEachIndexed { index, superParameter ->
-                        val superKey = superParameter.getKeyForConstant() ?: return@forEachIndexed
-                        val hereParameter = namedFunction.valueParameters[index]
-                        val hereKey = hereParameter.getKeyForConstant()
-                        if (hereKey == null) {
-                            reportOn(hereParameter.source, ICDiagnostics.KIC_NOT_CONSTANT)
-                        } else if (hereKey != superKey) {
-                            reportOn(hereParameter.source, ICDiagnostics.KIC_OVERRIDE_CONSTANT_MISMATCH, superKey)
+                        }
+                        builder.addAll(permissions, superFunctionSymbol.name.asStringStripSpecialMarkers())
+                        superPermissions.addAll(permissions)
+                        superFunction.valueParameters.forEachIndexed { index, superParameter ->
+                            val superKey = superParameter.getKeyForConstant() ?: return@forEachIndexed
+                            val hereParameter = namedFunction.valueParameters[index]
+                            val hereKey = hereParameter.getKeyForConstant()
+                            if (hereKey == null) {
+                                reportOn(hereParameter.source, ICDiagnostics.KIC_NOT_CONSTANT)
+                            } else if (hereKey != superKey) {
+                                reportOn(hereParameter.source, ICDiagnostics.KIC_OVERRIDE_CONSTANT_MISMATCH, superKey)
+                            }
                         }
                     }
+                    checkLeakyPermissions(
+                        namedFunction.source,
+                        superPermissions,
+                        PermissionSet.fromPermissions(context.localPermissions, name.asStringStripSpecialMarkers())
+                    )
                 }
                 // FIXME ensure overrides in classes implementing function types have correct permissions
             }
         }
 
     override fun visitConstructor(constructor: FirConstructor, data: Context): Nothing? =
-        extendAndCheckReferencedTypePermissions(constructor, data) { builder ->
+        extendAndCheckReferencedTypePermissions(constructor, data) { _, builder ->
             constructor.valueParameters.forEach {
                 builder.addFromType(it.returnTypeRef)
             }
@@ -956,8 +1004,9 @@ internal class PermissionChecker(
     ): Nothing? {
         val parentInfo = data.parentInfo
         if (parentInfo is ParentInfo.FunctionArgument) {
+            val localPermissions = parentInfo.permissions
             anonymousFunctionExpression.acceptChildren(
-                this, Context(parentInfo.permissions + data.permissions, data.scope, null)
+                this, Context(localPermissions, localPermissions setUnion data.permissions, data.scope, null)
             )
         } else {
             visitElement(anonymousFunctionExpression, data)

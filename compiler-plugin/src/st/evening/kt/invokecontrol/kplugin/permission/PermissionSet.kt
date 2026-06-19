@@ -1,13 +1,27 @@
 package st.evening.kt.invokecontrol.kplugin.permission
 
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
+
 class PermissionSet(private val table: Map<Permission, Set<String>>) {
     companion object {
         val EMPTY: PermissionSet = PermissionSet(emptyMap())
 
+        @OptIn(ExperimentalContracts::class)
         inline fun build(action: (Builder) -> Unit): PermissionSet {
+            contract {
+                callsInPlace(action, InvocationKind.EXACTLY_ONCE)
+            }
             val builder = Builder()
             action(builder)
             return builder.build()
+        }
+
+        fun fromPermissions(permissions: Collection<Permission>, source: String): PermissionSet {
+            if (permissions.isEmpty()) return EMPTY
+            val sourceSet = setOf(source)
+            return PermissionSet(permissions.associateWith { sourceSet })
         }
     }
 

@@ -24,6 +24,15 @@ FILE: override.kt
                 ^ String(ROR)
             }
 
+        public open fun free(): R|kotlin/String| {
+            ^free String(free)
+        }
+
+        public open val clear: R|kotlin/String|
+            public get(): R|kotlin/String| {
+                ^ String(clear)
+            }
+
     }
     public final class Bar : R|foo/bar/Foo| {
         public constructor(): R|foo/bar/Bar| {
@@ -37,6 +46,15 @@ FILE: override.kt
         public open override val text: R|kotlin/String|
             public get(): R|kotlin/String| {
                 ^ String(K)
+            }
+
+        @R|foo/bar/Enclave|() public open override fun free(): R|kotlin/String| {
+            ^free String(uh oh)
+        }
+
+        @R|foo/bar/Enclave|() public open override val clear: R|kotlin/String|
+            public get(): R|kotlin/String| {
+                ^ String(oops)
             }
 
     }

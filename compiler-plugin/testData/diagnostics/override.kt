@@ -18,6 +18,11 @@ open class Foo {
     @Enclave
     open val text: String
         get() = "ROR"
+
+    open fun free(): String = "free"
+
+    open val clear: String
+        get() = "clear"
 }
 
 class Bar : Foo() {
@@ -25,4 +30,11 @@ class Bar : Foo() {
 
     <!KIC_LEAKY_DECLARATION!>override val text: String
         get() = "K"<!>
+
+    <!KIC_LEAKY_DECLARATION!>@Enclave
+    override fun free(): String = "uh oh"<!>
+
+    <!KIC_LEAKY_DECLARATION!>@Enclave
+    override val clear: String
+        get() = "oops"<!>
 }
