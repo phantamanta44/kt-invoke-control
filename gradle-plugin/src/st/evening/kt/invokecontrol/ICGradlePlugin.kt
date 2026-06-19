@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
 @Suppress("unused") // Used via reflection.
 class ICGradlePlugin : KotlinCompilerPluginSupportPlugin {
     override fun apply(target: Project) {
-        target.extensions.create("ktInvokeControl", ICGradleExtension::class.java)
+        target.extensions.create(ICExtension::class.java, "ktInvokeControl", ICExtensionImpl::class.java, target)
     }
 
     override fun isApplicable(kotlinCompilation: KotlinCompilation<*>): Boolean = true
@@ -28,8 +28,10 @@ class ICGradlePlugin : KotlinCompilerPluginSupportPlugin {
     ): Provider<List<SubpluginOption>> {
         val project = kotlinCompilation.target.project
         return project.provider {
-            project.extensions.getByType(ICGradleExtension::class.java).annotations.map { (fqName, permissions) ->
-                SubpluginOption("restrict-annotation", "$fqName=${permissions.joinToString(",")}")
+            project.extensions.getByType(ICExtension::class.java).annotations.mapNotNull { (fqName, spec) ->
+                spec.permissions.orNull?.let {
+                    SubpluginOption("restrict-annotation", "$fqName=${it.joinToString(",")}")
+                }
             }
         }
     }
