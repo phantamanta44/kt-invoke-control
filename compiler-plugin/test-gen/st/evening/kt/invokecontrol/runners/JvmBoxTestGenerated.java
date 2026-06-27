@@ -135,6 +135,12 @@ public class JvmBoxTestGenerated extends AbstractJvmBoxTest {
   }
 
   @Test
+  @TestMetadata("propertyDelegate.kt")
+  public void testPropertyDelegate() {
+    runTest("compiler-plugin/testData/box/propertyDelegate.kt");
+  }
+
+  @Test
   @TestMetadata("readme.kt")
   public void testReadme() {
     runTest("compiler-plugin/testData/box/readme.kt");

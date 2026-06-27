@@ -129,6 +129,12 @@ public class JvmDiagnosticTestGenerated extends AbstractJvmDiagnosticTest {
   }
 
   @Test
+  @TestMetadata("propertyDelegate.kt")
+  public void testPropertyDelegate() {
+    runTest("compiler-plugin/testData/diagnostics/propertyDelegate.kt");
+  }
+
+  @Test
   @TestMetadata("sam.kt")
   public void testSam() {
     runTest("compiler-plugin/testData/diagnostics/sam.kt");

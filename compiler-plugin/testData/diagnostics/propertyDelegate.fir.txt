@@ -1,0 +1,22 @@
+FILE: propertyDelegate.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    @R|foo/bar/Enclave|() public final fun ok(): R|kotlin/Lazy<kotlin/String>| {
+        ^ok R|kotlin/lazy|<R|kotlin/String|>(<L> = lazy@fun <anonymous>(): R|kotlin/String| <inline=NoInline>  {
+            ^ String(OK)
+        }
+        )
+    }
+    public final val value: R|kotlin/String|by R|foo/bar/ok|()
+        public get(): R|kotlin/String| {
+            ^ D|foo/bar/value|.R|kotlin/getValue|<R|kotlin/String|>(Null(null), ::R|foo/bar/value|)
+        }
+    public final fun box(): R|kotlin/String| {
+        ^box R|foo/bar/value|
+    }
