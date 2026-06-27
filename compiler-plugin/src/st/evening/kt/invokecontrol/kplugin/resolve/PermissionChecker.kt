@@ -46,6 +46,7 @@ import org.jetbrains.kotlin.fir.expressions.FirResolvable
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.FirSamConversionExpression
 import org.jetbrains.kotlin.fir.expressions.FirTypeOperatorCall
+import org.jetbrains.kotlin.fir.expressions.FirVariableAssignment
 import org.jetbrains.kotlin.fir.expressions.argument
 import org.jetbrains.kotlin.fir.expressions.arguments
 import org.jetbrains.kotlin.fir.references.FirNamedReference
@@ -125,6 +126,7 @@ internal class PermissionChecker(
     sealed interface ParentInfo {
         class FunctionCall(val callee: FirFunction, val substitution: Permission.Substitution) : ParentInfo
         class FunctionArgument(val permissions: Set<Permission>) : ParentInfo
+        object AssignmentLhs : ParentInfo
     }
 
     class Context(
@@ -712,7 +714,8 @@ internal class PermissionChecker(
             if (callee is FirFunction) {
                 val valueParameters = callee.valueParameters
                 val valueArguments = (expression as FirCall).arguments
-                if (valueParameters.size != valueArguments.size) return // slightly redundant for normal functions because this is also checked while computing the permission substitution
+                // slightly redundant for normal functions because this is also checked in buildPermissionSubstitution
+                if (valueParameters.size != valueArguments.size) return
                 valueParameters.forEachIndexed { index, parameter ->
                     checkAssignment(parameter, valueArguments[index], typeSubst, permissionSubst)
                 }
@@ -741,7 +744,8 @@ internal class PermissionChecker(
         val (calleeName, requiredPermissions) = context(dContext, reporter) {
             resolveService.resolveCallable(
                 calleeReference,
-                (expression as? FirQualifiedAccessExpression)?.dispatchReceiver
+                (expression as? FirQualifiedAccessExpression)?.dispatchReceiver,
+                context.parentInfo is ParentInfo.AssignmentLhs
             )
         }
         checkAccessPermissions(
@@ -888,6 +892,13 @@ internal class PermissionChecker(
                 }
             }
         }
+
+    override fun visitVariableAssignment(variableAssignment: FirVariableAssignment, data: Context): Nothing? {
+        variableAssignment.annotations.forEach { it.accept(this, data) }
+        variableAssignment.lValue.accept(this, data.withParentInfo(ParentInfo.AssignmentLhs))
+        variableAssignment.rValue.accept(this, data)
+        return null
+    }
 
     // Expressions
 

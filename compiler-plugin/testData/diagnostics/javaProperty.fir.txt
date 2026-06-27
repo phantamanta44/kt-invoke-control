@@ -1,0 +1,19 @@
+FILE: javaProperty.kt
+    @FILE:R|kotlin/Suppress|(names = vararg(String(DEPRECATION)))
+    package foo.bar
+
+    public final fun test1(): R|kotlin/Unit| {
+        lval x: R|[] kotlin/Int| = R|java/util/Date.Date|(Long(0)).R|java/util/Date.year|
+        R|java/util/Date.Date|(Long(0)).R|java/util/Date.year| = Int(2052)
+        lval y: R|[] kotlin/Int| = Q|java/net/HttpURLConnection|.R|java/net/HttpURLConnection.HTTP_SERVER_ERROR*s|
+    }
+    public final class Test2 : R|java/lang/SecurityManager| {
+        public constructor(): R|foo/bar/Test2| {
+            super<R|java/lang/SecurityManager|>()
+        }
+
+        public final fun test2(): R|kotlin/Unit| {
+            lval x: R|[] kotlin/Boolean| = this@R|foo/bar/Test2|.R|java/lang/SecurityManager.inCheck|
+        }
+
+    }

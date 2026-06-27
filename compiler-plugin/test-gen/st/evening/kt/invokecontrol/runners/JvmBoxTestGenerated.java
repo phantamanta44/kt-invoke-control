@@ -129,6 +129,12 @@ public class JvmBoxTestGenerated extends AbstractJvmBoxTest {
   }
 
   @Test
+  @TestMetadata("propertyAccessor.kt")
+  public void testPropertyAccessor() {
+    runTest("compiler-plugin/testData/box/propertyAccessor.kt");
+  }
+
+  @Test
   @TestMetadata("readme.kt")
   public void testReadme() {
     runTest("compiler-plugin/testData/box/readme.kt");

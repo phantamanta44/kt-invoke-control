@@ -1,0 +1,38 @@
+FILE: propertyAccessor.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(property))) public final var value: R|[] kotlin/String| = String(ERROR)
+        @PROPERTY_GETTER:R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(getter))) public get(): R|kotlin/String|
+        @PROPERTY_SETTER:R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(setter))) public set(value: R|[] kotlin/String|): R|kotlin/Unit|
+    public final fun none(): R|kotlin/Unit| {
+        R|foo/bar/value| = String(OK)
+        lval x: R|[] kotlin/String| = R|foo/bar/value|
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(property))) public final fun p(): R|kotlin/Unit| {
+        R|foo/bar/value| = String(OK)
+        lval x: R|[] kotlin/String| = R|foo/bar/value|
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(setter))) public final fun s(): R|kotlin/Unit| {
+        R|foo/bar/value| = String(OK)
+        lval x: R|[] kotlin/String| = R|foo/bar/value|
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(getter))) public final fun g(): R|kotlin/Unit| {
+        R|foo/bar/value| = String(OK)
+        lval x: R|[] kotlin/String| = R|foo/bar/value|
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(setter), String(getter))) public final fun sg(): R|kotlin/Unit| {
+        R|foo/bar/value| = String(OK)
+        lval x: R|[] kotlin/String| = R|foo/bar/value|
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(property), String(getter))) public final fun pg(): R|kotlin/Unit| {
+        R|foo/bar/value| = String(OK)
+        lval x: R|[] kotlin/String| = R|foo/bar/value|
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(property), String(setter))) public final fun ps(): R|kotlin/Unit| {
+        R|foo/bar/value| = String(OK)
+        lval x: R|[] kotlin/String| = R|foo/bar/value|
+    }
+    @R|st/evening/kt/invokecontrol/ICRestrict|(permissions = vararg(String(property), String(setter), String(getter))) public final fun psg(): R|kotlin/Unit| {
+        R|foo/bar/value| = String(OK)
+        lval x: R|[] kotlin/String| = R|foo/bar/value|
+    }

@@ -99,6 +99,12 @@ public class JvmDiagnosticTestGenerated extends AbstractJvmDiagnosticTest {
   }
 
   @Test
+  @TestMetadata("javaProperty.kt")
+  public void testJavaProperty() {
+    runTest("compiler-plugin/testData/diagnostics/javaProperty.kt");
+  }
+
+  @Test
   @TestMetadata("object.kt")
   public void testObject() {
     runTest("compiler-plugin/testData/diagnostics/object.kt");
@@ -114,6 +120,12 @@ public class JvmDiagnosticTestGenerated extends AbstractJvmDiagnosticTest {
   @TestMetadata("property.kt")
   public void testProperty() {
     runTest("compiler-plugin/testData/diagnostics/property.kt");
+  }
+
+  @Test
+  @TestMetadata("propertyAccessor.kt")
+  public void testPropertyAccessor() {
+    runTest("compiler-plugin/testData/diagnostics/propertyAccessor.kt");
   }
 
   @Test

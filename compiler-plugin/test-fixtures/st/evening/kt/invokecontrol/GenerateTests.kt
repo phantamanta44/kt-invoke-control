@@ -14,10 +14,6 @@ fun main() {
             testClass<AbstractJvmBoxTest> {
                 model("box")
             }
-
-//            testClass<AbstractJsBoxTest> {
-//                model("box")
-//            }
         }
     }
 }

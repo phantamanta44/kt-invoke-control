@@ -8,11 +8,16 @@ import st.evening.kt.invokecontrol.ICRestrictAnnotation
 annotation class Enclave
 
 fun box(): String {
-    return <!KIC_INSUFFICIENT_PERMISSIONS!>Test().value<!>
+    val x = Test()
+    <!KIC_INSUFFICIENT_PERMISSIONS!>x.variable<!> = "OK"
+    return <!KIC_INSUFFICIENT_PERMISSIONS!>x.value<!>
 }
 
 class Test {
     @Enclave
+    var variable: String = "ERROR"
+
+    @Enclave
     val value: String
-        get() = "OK"
+        get() = variable
 }

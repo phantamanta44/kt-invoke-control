@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.declarations.evaluateAs
 import org.jetbrains.kotlin.fir.declarations.extractEnumValueArgumentInfo
 import org.jetbrains.kotlin.fir.declarations.findArgumentByName
+import org.jetbrains.kotlin.fir.declarations.synthetic.FirSyntheticPropertyAccessor
 import org.jetbrains.kotlin.fir.declarations.toAnnotationClassIdSafe
 import org.jetbrains.kotlin.fir.declarations.toAnnotationClassLikeSymbol
 import org.jetbrains.kotlin.fir.declarations.utils.classId
@@ -40,6 +41,7 @@ import org.jetbrains.kotlin.fir.resolve.toClassLikeSymbol
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.session.sourcesToPathsMapper
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
+import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.fir.types.ConeCapturedType
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType
 import org.jetbrains.kotlin.fir.types.ConeFlexibleType
@@ -84,6 +86,7 @@ import st.evening.kt.invokecontrol.kplugin.util.mapType
 import st.evening.kt.invokecontrol.kplugin.util.mapTypeLater
 import st.evening.kt.invokecontrol.kplugin.util.nullableToMaybe
 import st.evening.kt.invokecontrol.kplugin.util.orNull
+import st.evening.kt.invokecontrol.kplugin.util.setUnion
 import st.evening.kt.invokecontrol.kplugin.util.transformLeaves
 import st.evening.kt.invokecontrol.kplugin.util.traverseLater
 
@@ -264,7 +267,8 @@ class ICResolveService(
     context(context: DiagnosticContext, reporter: DiagnosticReporter)
     fun resolveCallable(
         callableReference: FirNamedReference,
-        dispatchReceiver: FirExpression?
+        dispatchReceiver: FirExpression?,
+        assignmentLhs: Boolean
     ): Pair<String, Set<Permission>?> {
         if (dispatchReceiver != null) {
             if (dispatchReceiver.resolvedType.isSomeFunctionType(session)) { // TODO check that it's actually invoke()
@@ -281,7 +285,19 @@ class ICResolveService(
         }
         return Pair(
             callableReference.name.asStringStripSpecialMarkers(),
-            callableReference.resolved?.resolvedSymbol?.let { getDeclarationAnnotatedPermissions(it.fir) }
+            callableReference.resolved?.resolvedSymbol?.let { symbol ->
+                if (symbol is FirPropertySymbol) {
+                    val accessorSymbol = if (assignmentLhs) symbol.setterSymbol else symbol.getterSymbol
+                    if (accessorSymbol != null) {
+                        val accessor = accessorSymbol.fir
+                        return@let getDeclarationAnnotatedPermissions(symbol.fir) setUnion
+                            getDeclarationAnnotatedPermissions(
+                                if (accessor is FirSyntheticPropertyAccessor) accessor.delegate else accessor
+                            )
+                    }
+                }
+                return@let getDeclarationAnnotatedPermissions(symbol.fir)
+            }
         )
     }
 

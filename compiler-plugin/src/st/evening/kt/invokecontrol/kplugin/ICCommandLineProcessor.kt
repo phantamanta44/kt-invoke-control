@@ -22,6 +22,30 @@ class ICCommandLineProcessor : CommandLineProcessor {
     companion object {
         val RESTRICT_ANNOTATIONS: CompilerConfigurationKey<Map<ClassId, List<Permission>>> =
             CompilerConfigurationKey.create("kic-restrict-annotation")
+
+        fun parseOption(optionString: String): Pair<ClassId, List<Permission>> {
+            val parts = optionString.split('=', limit = 2)
+            if (parts.size != 2) {
+                throw IllegalArgumentException("Malformed restrict annotation option: $optionString")
+            }
+            val annotationClassId = ClassId.fromString(parts[0])
+            val permissions = context(CliDiagnosticReporter, CliDiagnosticContext) {
+                parts[1].split(',').map { Permission.fromTemplate(it, null)!! }
+            }
+            return annotationClassId to permissions
+        }
+
+        fun processOption(configuration: CompilerConfiguration, optionString: String) {
+            val (annotationClassId, permissions) = parseOption(optionString)
+            val annotations = configuration.getMap(RESTRICT_ANNOTATIONS)
+            if (annotations is HashMap<*, *>) {
+                annotations[annotationClassId] = permissions
+            } else {
+                val newAnnotations = HashMap(annotations)
+                newAnnotations[annotationClassId] = permissions
+                configuration.put(RESTRICT_ANNOTATIONS, newAnnotations)
+            }
+        }
     }
 
     override val pluginId: String
@@ -38,24 +62,7 @@ class ICCommandLineProcessor : CommandLineProcessor {
 
     override fun processOption(option: AbstractCliOption, value: String, configuration: CompilerConfiguration) {
         when (option.optionName) {
-            "restrict-annotation" -> {
-                val parts = value.split('=', limit = 2)
-                if (parts.size != 2) {
-                    throw IllegalArgumentException("Malformed restrict annotation option: $value")
-                }
-                val permissions = context(CliDiagnosticReporter, CliDiagnosticContext) {
-                    parts[1].split(',').map { Permission.fromTemplate(it, null)!! }
-                }
-                val annotations = configuration.getMap(RESTRICT_ANNOTATIONS)
-                if (annotations is HashMap<*, *>) {
-                    annotations[ClassId.fromString(parts[0])] = permissions
-                } else {
-                    val newAnnotations = HashMap(annotations)
-                    newAnnotations[ClassId.fromString(parts[0])] = permissions
-                    configuration.put(RESTRICT_ANNOTATIONS, newAnnotations)
-                }
-            }
-
+            "restrict-annotation" -> processOption(configuration, value)
             else -> error("Unexpected option: ${option.optionName}")
         }
     }
