@@ -81,6 +81,12 @@ public class JvmBoxTestGenerated extends AbstractJvmBoxTest {
   }
 
   @Test
+  @TestMetadata("functionClass.kt")
+  public void testFunctionClass() {
+    runTest("compiler-plugin/testData/box/functionClass.kt");
+  }
+
+  @Test
   @TestMetadata("functionRef.kt")
   public void testFunctionRef() {
     runTest("compiler-plugin/testData/box/functionRef.kt");

@@ -52,7 +52,9 @@ import org.jetbrains.kotlin.fir.expressions.arguments
 import org.jetbrains.kotlin.fir.references.FirNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
+import org.jetbrains.kotlin.fir.resolve.defaultType
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
+import org.jetbrains.kotlin.fir.resolve.getContainingClass
 import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
@@ -453,34 +455,48 @@ internal class PermissionChecker(
         val destCtor = destClassType.typeConstructor()
         if (isSimpleSubtype(destCtor, valueClassType.typeConstructor())) return FunctionTypeCheckResult.Success
 
-        if (destClassType.isSomeFunctionType(session)) {
-            val destAttribute = destClassType.attributes.icFunctionTypePermissions
-                ?: throw IllegalStateException("Destination missing attribute: ${destClassType.renderForDebugging()}")
-            val valueAttribute = valueClassType.attributes.icFunctionTypePermissions
-                ?: throw IllegalStateException("Value missing attribute: ${valueClassType.renderForDebugging()}")
-            when (val destP = destAttribute.permissions) {
-                PermissionP.Poison -> return FunctionTypeCheckResult.Poison(destSource)
-                is PermissionP.Some -> {
-                    when (val valueP = valueAttribute.permissions) {
-                        PermissionP.Poison -> return FunctionTypeCheckResult.Poison(valueSource)
-                        is PermissionP.Some -> {
-                            val destPermissions = destP.permissions
-                            val valuePermissions = valueP.permissions
-                            if (!destPermissions.containsAll(valuePermissions)) {
-                                return FunctionTypeCheckResult.Leak(valuePermissions - destPermissions)
-                            }
-                        }
-                    }
-                }
+        val valueClassPermissions = valueClassType.attributes.icFunctionTypePermissions?.let {
+            when (val valueP = it.permissions) {
+                PermissionP.Poison -> return FunctionTypeCheckResult.Poison(valueSource)
+                is PermissionP.Some -> valueP.permissions
             }
-        }
+        } ?: emptySet()
 
-        AbstractTypeChecker.findCorrespondingSupertypes(valueClassType, destCtor).forEach { superTypeArguments ->
-            val valueArguments = superTypeArguments.asArgumentList()
+        val superTypes = AbstractTypeChecker.findCorrespondingSupertypes(valueClassType, destCtor)
+        if (superTypes.isEmpty()) return FunctionTypeCheckResult.Pass
+        superTypes.forEach { superType ->
+            val valueArguments = superType.asArgumentList()
             val valueArgumentCount = valueArguments.size()
             val parameterCount = destCtor.parametersCount()
             if (valueArgumentCount != parameterCount || valueArgumentCount != destClassType.argumentsCount()) {
                 return FunctionTypeCheckResult.Pass
+            }
+
+            if (destClassType.isSomeFunctionType(session)) {
+                val destAttribute = destClassType.attributes.icFunctionTypePermissions ?: throw IllegalStateException(
+                    "Destination missing attribute: ${destClassType.renderForDebugging()}"
+                )
+                superType as ConeKotlinType
+                val superAttribute = context(reporter) {
+                    resolveService.transformAnnotatedTypes(superType)
+                }.attributes.icFunctionTypePermissions ?: throw IllegalStateException(
+                    "Value super-type constructor call missing attribute: ${superType.renderForDebugging()}"
+                )
+                when (val destP = destAttribute.permissions) {
+                    PermissionP.Poison -> return FunctionTypeCheckResult.Poison(destSource)
+                    is PermissionP.Some -> {
+                        when (val superP = superAttribute.permissions) {
+                            PermissionP.Poison -> return FunctionTypeCheckResult.Poison(valueSource)
+                            is PermissionP.Some -> {
+                                val destPermissions = destP.permissions
+                                val valuePermissions = valueClassPermissions setUnion superP.permissions
+                                if (!destPermissions.containsAll(valuePermissions)) {
+                                    return FunctionTypeCheckResult.Leak(valuePermissions - destPermissions)
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             for (index in 0..<parameterCount) {
@@ -839,8 +855,41 @@ internal class PermissionChecker(
                 val superFunctions = scope.getDirectOverriddenFunctions(namedFunction.symbol, true)
                 if (superFunctions.isNotEmpty()) {
                     val superPermissions = mutableSetOf<Permission>()
+                    val tsState = session.typeContext.newTypeCheckerState(
+                        errorTypesEqualToAnything = false,
+                        stubTypesEqualToAnything = false
+                    )
                     superFunctions.forEach { superFunctionSymbol ->
                         val superFunction = superFunctionSymbol.fir
+                        superFunction.getContainingClass()?.let { superFunctionClass ->
+                            val superFunctionClassType = superFunctionClass.defaultType()
+                            if (!superFunctionClassType.isSomeFunctionType(session)) return@let
+                            context(tsState, tsState.typeSystemContext) {
+                                AbstractTypeChecker.findCorrespondingSupertypes(
+                                    containingClassSymbol.defaultType(),
+                                    superFunctionClassType.typeConstructor()
+                                ).forEach { superType ->
+                                    superType as ConeKotlinType
+                                    val superAttribute = context(reporter) {
+                                        resolveService.transformAnnotatedTypes(superType)
+                                    }.attributes.icFunctionTypePermissions ?: throw IllegalStateException(
+                                        "Function super-type constructor call missing attribute: " +
+                                            superType.renderForDebugging()
+                                    )
+                                    when (val superP = superAttribute.permissions) {
+                                        PermissionP.Poison ->
+                                            reportOn(namedFunction.source, ICDiagnostics.KIC_POISON_FUNCTION_TYPE)
+                                        is PermissionP.Some -> {
+                                            builder.addAll(
+                                                superP.permissions,
+                                                superFunctionClass.name.asStringStripSpecialMarkers()
+                                            )
+                                            superPermissions.addAll(superP.permissions)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         val permissions = context(reporter) {
                             resolveService.getDeclarationAnnotatedPermissions(superFunction)
                         }
@@ -863,7 +912,6 @@ internal class PermissionChecker(
                         PermissionSet.fromPermissions(context.localPermissions, name.asStringStripSpecialMarkers())
                     )
                 }
-                // FIXME ensure overrides in classes implementing function types have correct permissions
             }
         }
 

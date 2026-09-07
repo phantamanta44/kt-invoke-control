@@ -1,0 +1,41 @@
+FILE: functionClass.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.FUNCTION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.EXPRESSION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final fun <T> runFunction(f: R|[] () -> T|): R|T| {
+        ^runFunction R|<local>/f|.R|SubstitutionOverride<kotlin/Function0.invoke: R|T|>|()
+    }
+    public final fun test(): R|kotlin/Unit| {
+        R|foo/bar/runFunction|<R|kotlin/String|>(R|foo/bar/Factory.Factory|(String(OK)))
+        R|foo/bar/runFunction|<R|kotlin/Unit|>(R|foo/bar/Alerter.Alerter|())
+    }
+    public final class Factory : R|@R|foo/bar/Enclave|()  () -> kotlin/String| {
+        public constructor(value: R|[] kotlin/String|): R|foo/bar/Factory| {
+            super<R|kotlin/Any|>()
+        }
+
+        private final val value: R|[] kotlin/String| = R|<local>/value|
+            private get(): R|kotlin/String|
+
+        public open override operator fun invoke(): R|kotlin/String| {
+            ^invoke this@R|foo/bar/Factory|.R|foo/bar/Factory.value|
+        }
+
+    }
+    public abstract interface Callback : R|@R|foo/bar/Enclave|()  () -> kotlin/Unit| {
+    }
+    public final class Alerter : R|foo/bar/Callback| {
+        public constructor(): R|foo/bar/Alerter| {
+            super<R|kotlin/Any|>()
+        }
+
+        public open override operator fun invoke(): R|kotlin/Unit| {
+            R|kotlin/io/println|(String(alert!))
+        }
+
+    }

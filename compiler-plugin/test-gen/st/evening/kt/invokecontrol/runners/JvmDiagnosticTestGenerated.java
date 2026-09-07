@@ -87,6 +87,12 @@ public class JvmDiagnosticTestGenerated extends AbstractJvmDiagnosticTest {
   }
 
   @Test
+  @TestMetadata("functionClass.kt")
+  public void testFunctionClass() {
+    runTest("compiler-plugin/testData/diagnostics/functionClass.kt");
+  }
+
+  @Test
   @TestMetadata("functionRef.kt")
   public void testFunctionRef() {
     runTest("compiler-plugin/testData/diagnostics/functionRef.kt");
