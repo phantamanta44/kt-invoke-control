@@ -13,7 +13,7 @@ FILE: propertyDelegate.kt
         }
         )
     }
-    public final val value: R|kotlin/String|by R|foo/bar/ok|()
+    public final val value: R|[] kotlin/String|by R|foo/bar/ok|()
         public get(): R|kotlin/String| {
             ^ D|foo/bar/value|.R|kotlin/getValue|<R|kotlin/String|>(Null(null), ::R|foo/bar/value|)
         }

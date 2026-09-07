@@ -165,6 +165,12 @@ public class JvmBoxTestGenerated extends AbstractJvmBoxTest {
   }
 
   @Test
+  @TestMetadata("typeAlias.kt")
+  public void testTypeAlias() {
+    runTest("compiler-plugin/testData/box/typeAlias.kt");
+  }
+
+  @Test
   @TestMetadata("var.kt")
   public void testVar() {
     runTest("compiler-plugin/testData/box/var.kt");

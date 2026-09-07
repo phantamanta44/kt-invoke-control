@@ -1,0 +1,89 @@
+FILE: typeAlias.kt
+    package foo.bar
+
+    @R|st/evening/kt/invokecontrol/ICRestrictAnnotation|(permissions = vararg(String(enclave))) @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.FUNCTION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.EXPRESSION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class Enclave : R|kotlin/Annotation| {
+        public constructor(): R|foo/bar/Enclave| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final typealias Name = R|kotlin/String|
+    public final val test1: R|{foo/bar/Name=} [] kotlin/String| = String(world)
+        public get(): R|{foo/bar/Name=} kotlin/String|
+    public final val test2: R|{foo/bar/Name=} [] kotlin/String|
+        public get(): R|{foo/bar/Name=} kotlin/String| {
+            ^ String(universe)
+        }
+    public final var test3: R|{foo/bar/Name=} [] kotlin/String| = String(Constantinople)
+        public get(): R|{foo/bar/Name=} kotlin/String|
+        public set(value: R|{foo/bar/Name=} [] kotlin/String|): R|kotlin/Unit|
+    public final lateinit var test4: R|{foo/bar/Name=} [] kotlin/String|
+        public get(): R|{foo/bar/Name=} kotlin/String|
+        public set(value: R|{foo/bar/Name=} [] kotlin/String|): R|kotlin/Unit|
+    public final fun greet(name: R|{foo/bar/Name=} [] kotlin/String|): R|kotlin/Unit| {
+        R|kotlin/io/println|(<strcat>(String(Hello, ), R|<local>/name|, String(!)))
+    }
+    public final typealias Two<T> = R|kotlin/Pair<T, T>|
+    public final val test5: R|{foo/bar/Two<kotlin/String>=} [] kotlin/Pair<[] kotlin/String, [] kotlin/String>| = String(oath).R|kotlin/to|<R|kotlin/String|, R|kotlin/String|>(String(order))
+        public get(): R|{foo/bar/Two<kotlin/String>=} kotlin/Pair<kotlin/String, kotlin/String>|
+    public final val test6: R|{foo/bar/Two<kotlin/Int>=} [] kotlin/Pair<[] kotlin/Int, [] kotlin/Int>|
+        public get(): R|{foo/bar/Two<kotlin/Int>=} kotlin/Pair<kotlin/Int, kotlin/Int>| {
+            ^ Int(9).R|kotlin/to|<R|kotlin/Int|, R|kotlin/Int|>(Int(5))
+        }
+    public final var test7: R|{foo/bar/Two<kotlin/String>=} [] kotlin/Pair<[] kotlin/String, [] kotlin/String>| = String(north).R|kotlin/to|<R|kotlin/String|, R|kotlin/String|>(String(south))
+        public get(): R|{foo/bar/Two<kotlin/String>=} kotlin/Pair<kotlin/String, kotlin/String>|
+        public set(value: R|{foo/bar/Two<kotlin/String>=} [] kotlin/Pair<[] kotlin/String, [] kotlin/String>|): R|kotlin/Unit|
+    public final lateinit var test8: R|{foo/bar/Two<kotlin/Int>=} [] kotlin/Pair<[] kotlin/Int, [] kotlin/Int>|
+        public get(): R|{foo/bar/Two<kotlin/Int>=} kotlin/Pair<kotlin/Int, kotlin/Int>|
+        public set(value: R|{foo/bar/Two<kotlin/Int>=} [] kotlin/Pair<[] kotlin/Int, [] kotlin/Int>|): R|kotlin/Unit|
+    public final fun printFirst(two: R|{foo/bar/Two<*>=} [] kotlin/Pair<*, *>|): R|kotlin/Unit| {
+        R|kotlin/io/println|(R|<local>/two|.R|SubstitutionOverride<kotlin/Pair.first: R|kotlin/Any?|>|)
+    }
+    public final typealias Op<T> = R|@R|foo/bar/Enclave|()  (T) -> T|
+    public final val test9: R|{foo/bar/Op<kotlin/Int>=} @R|foo/bar/Enclave|()  [enclave] ([] kotlin/Int) -> [] kotlin/Int| = fun <anonymous>(it: R|kotlin/Int|): R|kotlin/Int| <inline=NoInline>  {
+        ^ R|<local>/it|.R|kotlin/Int.unaryMinus|()
+    }
+
+        public get(): R|{foo/bar/Op<kotlin/Int>=} @R|foo/bar/Enclave|()  (kotlin/Int) -> kotlin/Int|
+    public final val test10: R|{foo/bar/Op<kotlin/String>=} @R|foo/bar/Enclave|()  [enclave] ([] kotlin/String) -> [] kotlin/String|
+        public get(): R|{foo/bar/Op<kotlin/String>=} @R|foo/bar/Enclave|()  (kotlin/String) -> kotlin/String| {
+            ^ fun <anonymous>(it: R|kotlin/String|): R|kotlin/String| <inline=NoInline>  {
+                ^ R|<local>/it|.R|kotlin/String.plus|(R|<local>/it|)
+            }
+
+        }
+    public final var test11: R|{foo/bar/Op<kotlin/Int>=} @R|foo/bar/Enclave|()  [enclave] ([] kotlin/Int) -> [] kotlin/Int| = fun <anonymous>(it: R|kotlin/Int|): R|kotlin/Int| <inline=NoInline>  {
+        ^ R|<local>/it|.R|kotlin/Int.plus|(Int(1))
+    }
+
+        public get(): R|{foo/bar/Op<kotlin/Int>=} @R|foo/bar/Enclave|()  (kotlin/Int) -> kotlin/Int|
+        public set(value: R|{foo/bar/Op<kotlin/Int>=} @R|foo/bar/Enclave|()  [enclave] ([] kotlin/Int) -> [] kotlin/Int|): R|kotlin/Unit|
+    public final lateinit var test12: R|{foo/bar/Op<kotlin/String>=} @R|foo/bar/Enclave|()  [enclave] ([] kotlin/String) -> [] kotlin/String|
+        public get(): R|{foo/bar/Op<kotlin/String>=} @R|foo/bar/Enclave|()  (kotlin/String) -> kotlin/String|
+        public set(value: R|{foo/bar/Op<kotlin/String>=} @R|foo/bar/Enclave|()  [enclave] ([] kotlin/String) -> [] kotlin/String|): R|kotlin/Unit|
+    public final fun box(): R|kotlin/String| {
+        R|foo/bar/greet|(R|foo/bar/test1|)
+        R|foo/bar/greet|(R|foo/bar/test2|)
+        R|foo/bar/test3| = String(Istanbul)
+        R|foo/bar/greet|(R|foo/bar/test3|)
+        R|foo/bar/test4| = String(Amy)
+        R|foo/bar/greet|(R|foo/bar/test4|)
+        R|foo/bar/printFirst|(R|foo/bar/test5|)
+        R|foo/bar/printFirst|(R|foo/bar/test6|)
+        R|foo/bar/test7| = String(east).R|kotlin/to|<R|kotlin/String|, R|kotlin/String|>(String(west))
+        R|foo/bar/printFirst|(R|foo/bar/test7|)
+        R|foo/bar/test8| = Int(1).R|kotlin/to|<R|kotlin/Int|, R|kotlin/Int|>(Int(9))
+        R|foo/bar/printFirst|(R|foo/bar/test8|)
+        R|kotlin/io/println|(R|foo/bar/test9|.R|SubstitutionOverride<kotlin/Function1.invoke: R|kotlin/Int|>|(Int(42)))
+        R|kotlin/io/println|(R|foo/bar/test10|.R|SubstitutionOverride<kotlin/Function1.invoke: R|kotlin/String|>|(String(foot)))
+        R|foo/bar/test11| = fun <anonymous>(it: R|kotlin/Int|): R|kotlin/Int| <inline=NoInline>  {
+            ^ R|<local>/it|.R|kotlin/Int.minus|(Int(1))
+        }
+
+        R|kotlin/io/println|(R|foo/bar/test11|.R|SubstitutionOverride<kotlin/Function1.invoke: R|kotlin/Int|>|(Int(42)))
+        R|foo/bar/test12| = fun <anonymous>(it: R|kotlin/String|): R|kotlin/String| <inline=NoInline>  {
+            ^ R|<local>/it|.R|kotlin/text/uppercase|()
+        }
+
+        ^box R|foo/bar/test12|.R|SubstitutionOverride<kotlin/Function1.invoke: R|kotlin/String|>|(String(ok))
+    }

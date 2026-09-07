@@ -153,6 +153,12 @@ public class JvmDiagnosticTestGenerated extends AbstractJvmDiagnosticTest {
   }
 
   @Test
+  @TestMetadata("typeAlias.kt")
+  public void testTypeAlias() {
+    runTest("compiler-plugin/testData/diagnostics/typeAlias.kt");
+  }
+
+  @Test
   @TestMetadata("var.kt")
   public void testVar() {
     runTest("compiler-plugin/testData/diagnostics/var.kt");

@@ -828,11 +828,17 @@ internal class PermissionChecker(
                 }
             }
         }
-        withErrorHandling(property.source) {
-            property.initializer?.let {
+        val initializer = property.initializer
+        if (initializer != null) {
+            withErrorHandling(property.source) {
                 context(session.typeContext) {
-                    checkAssignment(property, it, null, null)
+                    checkAssignment(property, initializer, null, null)
                 }
+            }
+        } else {
+            // must ensure the property type is transformed so the accessor signature checker doesn't complain
+            context(reporter) {
+                resolveService.resolveReturnTypePermissions(property)
             }
         }
         return null

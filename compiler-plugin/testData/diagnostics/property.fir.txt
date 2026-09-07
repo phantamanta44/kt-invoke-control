@@ -21,7 +21,7 @@ FILE: property.kt
             public get(): R|kotlin/String|
             public set(value: R|[] kotlin/String|): R|kotlin/Unit|
 
-        @R|foo/bar/Enclave|() public final val value: R|kotlin/String|
+        @R|foo/bar/Enclave|() public final val value: R|[] kotlin/String|
             public get(): R|kotlin/String| {
                 ^ this@R|foo/bar/Test|.R|foo/bar/Test.variable|
             }

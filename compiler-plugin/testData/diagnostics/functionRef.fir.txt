@@ -16,7 +16,7 @@ FILE: functionRef.kt
     @R|foo/bar/Enclave|() public final fun foo(): R|kotlin/String| {
         ^foo String(OK)
     }
-    @R|foo/bar/Enclave|() public final val bar: R|kotlin/String|
+    @R|foo/bar/Enclave|() public final val bar: R|[] kotlin/String|
         public get(): R|kotlin/String| {
             ^ String(K)
         }

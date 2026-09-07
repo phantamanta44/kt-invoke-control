@@ -19,7 +19,7 @@ FILE: override.kt
             ^talk <strcat>(String(ER), this@R|foo/bar/Foo|.R|foo/bar/Foo.text|)
         }
 
-        @R|foo/bar/Enclave|() public open val text: R|kotlin/String|
+        @R|foo/bar/Enclave|() public open val text: R|[] kotlin/String|
             public get(): R|kotlin/String| {
                 ^ String(ROR)
             }
@@ -28,7 +28,7 @@ FILE: override.kt
             ^free String(free)
         }
 
-        public open val clear: R|kotlin/String|
+        public open val clear: R|[] kotlin/String|
             public get(): R|kotlin/String| {
                 ^ String(clear)
             }
@@ -43,7 +43,7 @@ FILE: override.kt
             ^talk <strcat>(String(O), this@R|foo/bar/Bar|.R|foo/bar/Bar.text|)
         }
 
-        public open override val text: R|kotlin/String|
+        public open override val text: R|[] kotlin/String|
             public get(): R|kotlin/String| {
                 ^ String(K)
             }
@@ -52,7 +52,7 @@ FILE: override.kt
             ^free String(uh oh)
         }
 
-        @R|foo/bar/Enclave|() public open override val clear: R|kotlin/String|
+        @R|foo/bar/Enclave|() public open override val clear: R|[] kotlin/String|
             public get(): R|kotlin/String| {
                 ^ String(oops)
             }
