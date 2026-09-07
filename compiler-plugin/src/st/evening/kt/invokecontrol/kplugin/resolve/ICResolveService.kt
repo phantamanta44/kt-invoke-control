@@ -43,6 +43,7 @@ import org.jetbrains.kotlin.fir.session.sourcesToPathsMapper
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
 import org.jetbrains.kotlin.fir.types.ConeCapturedType
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType
 import org.jetbrains.kotlin.fir.types.ConeFlexibleType
@@ -286,23 +287,24 @@ class ICResolveService(
         }
         callableReference.resolved?.resolvedSymbol?.let { symbol ->
             when (symbol) {
-                is FirPropertySymbol -> {
-                    val accessorSymbol = if (assignmentLhs) symbol.setterSymbol else symbol.getterSymbol
-                    if (accessorSymbol != null) {
-                        val accessor = accessorSymbol.fir
-                        return Pair(
-                            PermissionSource.Property(symbol),
-                            getDeclarationAnnotatedPermissions(symbol.fir) setUnion
-                                getDeclarationAnnotatedPermissions(
-                                    if (accessor is FirSyntheticPropertyAccessor) accessor.delegate else accessor
-                                )
-                        )
-                    } else {
-                        return PermissionSource.Property(symbol) to getDeclarationAnnotatedPermissions(symbol.fir)
-                    }
-                }
                 is FirFunctionSymbol<*> -> {
                     return PermissionSource.Function(symbol) to getDeclarationAnnotatedPermissions(symbol.fir)
+                }
+                is FirVariableSymbol<*> -> {
+                    if (symbol is FirPropertySymbol) {
+                        val accessorSymbol = if (assignmentLhs) symbol.setterSymbol else symbol.getterSymbol
+                        if (accessorSymbol != null) {
+                            val accessor = accessorSymbol.fir
+                            return Pair(
+                                PermissionSource.Property(symbol),
+                                getDeclarationAnnotatedPermissions(symbol.fir) setUnion
+                                    getDeclarationAnnotatedPermissions(
+                                        if (accessor is FirSyntheticPropertyAccessor) accessor.delegate else accessor
+                                    )
+                            )
+                        }
+                    }
+                    return PermissionSource.Property(symbol) to getDeclarationAnnotatedPermissions(symbol.fir)
                 }
                 else -> throw UnsupportedOperationException("$symbol (${symbol.javaClass.simpleName})")
             }
