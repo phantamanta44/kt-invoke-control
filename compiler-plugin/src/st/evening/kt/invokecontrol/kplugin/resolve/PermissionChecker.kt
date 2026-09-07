@@ -401,7 +401,7 @@ internal class PermissionChecker(
             val destAttribute = destClassType.attributes.icFunctionTypePermissions
                 ?: throw IllegalStateException("Destination missing attribute: ${destClassType.renderForDebugging()}")
             val valueAttribute = valueClassType.attributes.icFunctionTypePermissions
-                ?: throw IllegalStateException("Value missing attribute: ${destClassType.renderForDebugging()}")
+                ?: throw IllegalStateException("Value missing attribute: ${valueClassType.renderForDebugging()}")
             when (val destP = destAttribute.permissions) {
                 PermissionP.Poison -> return FunctionTypeCheckResult.Poison(destSource)
                 is PermissionP.Some -> {
@@ -457,7 +457,7 @@ internal class PermissionChecker(
             val destAttribute = destClassType.attributes.icFunctionTypePermissions
                 ?: throw IllegalStateException("Destination missing attribute: ${destClassType.renderForDebugging()}")
             val valueAttribute = valueClassType.attributes.icFunctionTypePermissions
-                ?: throw IllegalStateException("Value missing attribute: ${destClassType.renderForDebugging()}")
+                ?: throw IllegalStateException("Value missing attribute: ${valueClassType.renderForDebugging()}")
             when (val destP = destAttribute.permissions) {
                 PermissionP.Poison -> return FunctionTypeCheckResult.Poison(destSource)
                 is PermissionP.Some -> {
