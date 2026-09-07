@@ -41,6 +41,7 @@ import org.jetbrains.kotlin.fir.resolve.toClassLikeSymbol
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.session.sourcesToPathsMapper
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
+import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.fir.types.ConeCapturedType
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType
@@ -52,7 +53,6 @@ import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRefCopy
 import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
 import org.jetbrains.kotlin.fir.types.isSomeFunctionType
 import org.jetbrains.kotlin.fir.types.lowerBoundIfFlexible
-import org.jetbrains.kotlin.fir.types.renderReadable
 import org.jetbrains.kotlin.fir.types.resolvedType
 import org.jetbrains.kotlin.fir.types.toTrivialFlexibleType
 import org.jetbrains.kotlin.fir.types.typeAnnotations
@@ -69,6 +69,7 @@ import st.evening.kt.invokecontrol.kplugin.ICNames
 import st.evening.kt.invokecontrol.kplugin.permission.FunctionTypePermissionsAttribute
 import st.evening.kt.invokecontrol.kplugin.permission.Permission
 import st.evening.kt.invokecontrol.kplugin.permission.PermissionP
+import st.evening.kt.invokecontrol.kplugin.permission.PermissionSource
 import st.evening.kt.invokecontrol.kplugin.permission.icDeclarationPermissions
 import st.evening.kt.invokecontrol.kplugin.permission.icFunctionTypePermissions
 import st.evening.kt.invokecontrol.kplugin.permission.icRestrictAnnotationPermissions
@@ -269,7 +270,7 @@ class ICResolveService(
         callableReference: FirNamedReference,
         dispatchReceiver: FirExpression?,
         assignmentLhs: Boolean
-    ): Pair<String, Set<Permission>?> {
+    ): Pair<PermissionSource, Set<Permission>?>? {
         if (dispatchReceiver != null) {
             if (dispatchReceiver.resolvedType.isSomeFunctionType(session)) { // TODO check that it's actually invoke()
                 val permissions = when (val p = resolveReturnTypePermissions(dispatchReceiver)) {
@@ -280,25 +281,33 @@ class ICResolveService(
                     }
                 }
                 // resolvedType may have changed in resolveFunctionTypePermissions
-                return dispatchReceiver.resolvedType.renderReadable() to permissions
+                return PermissionSource.RestrictedType(dispatchReceiver.resolvedType) to permissions
             }
         }
-        return Pair(
-            callableReference.name.asStringStripSpecialMarkers(),
-            callableReference.resolved?.resolvedSymbol?.let { symbol ->
-                if (symbol is FirPropertySymbol) {
+        callableReference.resolved?.resolvedSymbol?.let { symbol ->
+            when (symbol) {
+                is FirPropertySymbol -> {
                     val accessorSymbol = if (assignmentLhs) symbol.setterSymbol else symbol.getterSymbol
                     if (accessorSymbol != null) {
                         val accessor = accessorSymbol.fir
-                        return@let getDeclarationAnnotatedPermissions(symbol.fir) setUnion
-                            getDeclarationAnnotatedPermissions(
-                                if (accessor is FirSyntheticPropertyAccessor) accessor.delegate else accessor
-                            )
+                        return Pair(
+                            PermissionSource.Property(symbol),
+                            getDeclarationAnnotatedPermissions(symbol.fir) setUnion
+                                getDeclarationAnnotatedPermissions(
+                                    if (accessor is FirSyntheticPropertyAccessor) accessor.delegate else accessor
+                                )
+                        )
+                    } else {
+                        return PermissionSource.Property(symbol) to getDeclarationAnnotatedPermissions(symbol.fir)
                     }
                 }
-                return@let getDeclarationAnnotatedPermissions(symbol.fir)
+                is FirFunctionSymbol<*> -> {
+                    return PermissionSource.Function(symbol) to getDeclarationAnnotatedPermissions(symbol.fir)
+                }
+                else -> throw UnsupportedOperationException("$symbol (${symbol.javaClass.simpleName})")
             }
-        )
+        }
+        return null
     }
 
     @OptIn(SymbolInternals::class)

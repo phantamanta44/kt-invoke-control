@@ -14,13 +14,14 @@ import org.jetbrains.kotlin.diagnostics.rendering.RenderingContext
 import org.jetbrains.kotlin.diagnostics.warning0
 import org.jetbrains.kotlin.diagnostics.warning1
 import st.evening.kt.invokecontrol.kplugin.permission.Permission
+import st.evening.kt.invokecontrol.kplugin.permission.PermissionSource
 
 object ICDiagnostics : KtDiagnosticsContainer() {
     val KIC_INVALID_PERMISSION_ARGUMENT_KEY by error1<PsiElement, String>()
     val KIC_NO_SUCH_PERMISSION_ARGUMENT by error1<PsiElement, String>()
     val KIC_INVALID_PERMISSION_ARGUMENT_VALUE by error1<PsiElement, String>()
-    val KIC_INSUFFICIENT_PERMISSIONS by error2<PsiElement, Set<Permission>, Set<String>>()
-    val KIC_LEAKY_DECLARATION by error2<PsiElement, Set<Permission>, Set<String>>()
+    val KIC_INSUFFICIENT_PERMISSIONS by error2<PsiElement, Set<Permission>, Set<PermissionSource>>()
+    val KIC_LEAKY_DECLARATION by error2<PsiElement, Set<Permission>, Set<PermissionSource>>()
     val KIC_LEAKY_ASSIGNMENT by error1<PsiElement, Set<Permission>>()
     val KIC_LEAKY_CAST by warning1<PsiElement, Set<Permission>>()
     val KIC_POISON_FUNCTION_TYPE by error0<PsiElement>()
@@ -45,13 +46,13 @@ object ICDiagnostics : KtDiagnosticsContainer() {
                 KIC_INSUFFICIENT_PERMISSIONS,
                 "Missing required permissions {0} from {1}",
                 PermissionSetRenderer,
-                StringSetRenderer
+                PermissionSourceSetRenderer
             )
             map.put(
                 KIC_LEAKY_DECLARATION,
                 "Declaration leaks permissions {0} from {1}",
                 PermissionSetRenderer,
-                StringSetRenderer
+                PermissionSourceSetRenderer
             )
             map.put(
                 KIC_LEAKY_ASSIGNMENT,
@@ -85,7 +86,10 @@ object PermissionSetRenderer : DiagnosticParameterRenderer<Set<Permission>> {
     }
 }
 
-object StringSetRenderer : DiagnosticParameterRenderer<Set<String>> {
-    override fun render(obj: Set<String>, renderingContext: RenderingContext): String =
-        "[${obj.sorted().joinToReadableString()}]"
+object PermissionSourceSetRenderer : DiagnosticParameterRenderer<Set<PermissionSource>> {
+    override fun render(obj: Set<PermissionSource>, renderingContext: RenderingContext): String {
+        val strings = obj.mapTo(mutableListOf()) { it.getSourceName() }
+        strings.sort()
+        return "[${strings.joinToReadableString()}]"
+    }
 }

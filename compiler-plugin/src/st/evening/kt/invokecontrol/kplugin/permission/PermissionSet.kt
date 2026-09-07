@@ -4,7 +4,7 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
-class PermissionSet(private val table: Map<Permission, Set<String>>) {
+class PermissionSet(private val table: Map<Permission, Set<PermissionSource>>) {
     companion object {
         val EMPTY: PermissionSet = PermissionSet(emptyMap())
 
@@ -18,7 +18,7 @@ class PermissionSet(private val table: Map<Permission, Set<String>>) {
             return builder.build()
         }
 
-        fun fromPermissions(permissions: Collection<Permission>, source: String): PermissionSet {
+        fun fromPermissions(permissions: Collection<Permission>, source: PermissionSource): PermissionSet {
             if (permissions.isEmpty()) return EMPTY
             val sourceSet = setOf(source)
             return PermissionSet(permissions.associateWith { sourceSet })
@@ -35,14 +35,14 @@ class PermissionSet(private val table: Map<Permission, Set<String>>) {
 
     fun getPermissions(): Set<Permission> = table.keys
 
-    fun getProvenance(): Set<String> = table.values.flatMapTo(mutableSetOf()) { it }
+    fun getProvenance(): Set<PermissionSource> = table.values.flatMapTo(mutableSetOf()) { it }
 
     operator fun plus(o: PermissionSet): PermissionSet {
         val result = table.toMutableMap()
         o.table.forEach { (permission, sources) ->
             when (val existingSources = result[permission]) {
                 null -> result[permission] = HashSet()
-                is HashSet<String> -> existingSources.addAll(sources)
+                is HashSet<PermissionSource> -> existingSources.addAll(sources)
                 else -> result[permission] = HashSet(existingSources).apply { addAll(sources) }
             }
         }
@@ -58,13 +58,13 @@ class PermissionSet(private val table: Map<Permission, Set<String>>) {
     operator fun minus(o: PermissionSet): PermissionSet = this - o.getPermissions()
 
     class Builder {
-        private val table: MutableMap<Permission, MutableSet<String>> = mutableMapOf()
+        private val table: MutableMap<Permission, MutableSet<PermissionSource>> = mutableMapOf()
 
-        fun add(permission: Permission, source: String) {
+        fun add(permission: Permission, source: PermissionSource) {
             table.getOrPut(permission) { HashSet() } += source
         }
 
-        fun addAll(permissions: Collection<Permission>, source: String) {
+        fun addAll(permissions: Collection<Permission>, source: PermissionSource) {
             permissions.forEach { add(it, source) }
         }
 

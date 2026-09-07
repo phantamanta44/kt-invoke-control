@@ -110,6 +110,7 @@ import st.evening.kt.invokecontrol.kplugin.ICNames
 import st.evening.kt.invokecontrol.kplugin.permission.Permission
 import st.evening.kt.invokecontrol.kplugin.permission.PermissionP
 import st.evening.kt.invokecontrol.kplugin.permission.PermissionSet
+import st.evening.kt.invokecontrol.kplugin.permission.PermissionSource
 import st.evening.kt.invokecontrol.kplugin.permission.icFunctionTypePermissions
 import st.evening.kt.invokecontrol.kplugin.permission.substitute
 import st.evening.kt.invokecontrol.kplugin.permission.substituteOrSelf
@@ -307,7 +308,7 @@ internal class PermissionChecker(
                     context(reporter) {
                         resolveService.getDeclarationAnnotatedPermissions(symbol.fir)
                     },
-                    symbol.name.asStringStripSpecialMarkers()
+                    PermissionSource.Class(symbol)
                 )
             }
 
@@ -593,7 +594,7 @@ internal class PermissionChecker(
 
     private fun checkAccessPermissions(
         expression: FirExpression,
-        referentName: String,
+        referentSource: PermissionSource,
         requiredPermissions: Set<Permission>?,
         context: Context
     ) {
@@ -620,7 +621,7 @@ internal class PermissionChecker(
                     expression.source,
                     ICDiagnostics.KIC_INSUFFICIENT_PERMISSIONS,
                     remainingPermissions,
-                    setOf(referentName)
+                    setOf(referentSource)
                 )
             }
         } else if (grant != null) {
@@ -757,23 +758,24 @@ internal class PermissionChecker(
         }
 
         // check call permissions
-        val (calleeName, requiredPermissions) = context(dContext, reporter) {
+        context(dContext, reporter) {
             resolveService.resolveCallable(
                 calleeReference,
                 (expression as? FirQualifiedAccessExpression)?.dispatchReceiver,
                 context.parentInfo is ParentInfo.AssignmentLhs
             )
+        }?.let { (calleeSource, requiredPermissions) ->
+            checkAccessPermissions(
+                expression,
+                calleeSource,
+                requiredPermissions?.let {
+                    context(dContext) {
+                        it.substituteOrSelf(permissionSubst)
+                    }
+                },
+                context
+            )
         }
-        checkAccessPermissions(
-            expression,
-            calleeName,
-            requiredPermissions?.let {
-                context(dContext) {
-                    it.substituteOrSelf(permissionSubst)
-                }
-            },
-            context
-        )
     }
 
     // Declarations
@@ -812,13 +814,16 @@ internal class PermissionChecker(
                         val permissions = context(reporter) {
                             resolveService.getDeclarationAnnotatedPermissions(it.fir)
                         }
-                        builder.addAll(permissions, it.name.asStringStripSpecialMarkers())
+                        builder.addAll(permissions, PermissionSource.Property(it))
                         superPermissions.addAll(permissions)
                     }
                     checkLeakyPermissions(
                         property.source,
                         superPermissions,
-                        PermissionSet.fromPermissions(context.localPermissions, name.asStringStripSpecialMarkers())
+                        PermissionSet.fromPermissions(
+                            context.localPermissions,
+                            PermissionSource.Property(property.symbol)
+                        )
                     )
                 }
             }
@@ -882,7 +887,7 @@ internal class PermissionChecker(
                                         is PermissionP.Some -> {
                                             builder.addAll(
                                                 superP.permissions,
-                                                superFunctionClass.name.asStringStripSpecialMarkers()
+                                                PermissionSource.RestrictedType(superType)
                                             )
                                             superPermissions.addAll(superP.permissions)
                                         }
@@ -893,7 +898,7 @@ internal class PermissionChecker(
                         val permissions = context(reporter) {
                             resolveService.getDeclarationAnnotatedPermissions(superFunction)
                         }
-                        builder.addAll(permissions, superFunctionSymbol.name.asStringStripSpecialMarkers())
+                        builder.addAll(permissions, PermissionSource.Function(superFunctionSymbol))
                         superPermissions.addAll(permissions)
                         superFunction.valueParameters.forEachIndexed { index, superParameter ->
                             val superKey = superParameter.getKeyForConstant() ?: return@forEachIndexed
@@ -909,7 +914,10 @@ internal class PermissionChecker(
                     checkLeakyPermissions(
                         namedFunction.source,
                         superPermissions,
-                        PermissionSet.fromPermissions(context.localPermissions, name.asStringStripSpecialMarkers())
+                        PermissionSet.fromPermissions(
+                            context.localPermissions,
+                            PermissionSource.Function(namedFunction.symbol)
+                        )
                     )
                 }
             }
@@ -996,7 +1004,7 @@ internal class PermissionChecker(
             val symbol = resolvedQualifier.symbol ?: return@analyze
             checkAccessPermissions(
                 resolvedQualifier,
-                symbol.name.asString(),
+                PermissionSource.Class(symbol),
                 context(reporter) {
                     resolveService.getDeclarationAnnotatedPermissions(symbol.fir)
                 },
