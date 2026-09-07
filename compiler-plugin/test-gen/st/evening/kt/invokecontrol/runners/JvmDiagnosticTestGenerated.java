@@ -135,9 +135,9 @@ public class JvmDiagnosticTestGenerated extends AbstractJvmDiagnosticTest {
   }
 
   @Test
-  @TestMetadata("propertyDelegate.kt")
-  public void testPropertyDelegate() {
-    runTest("compiler-plugin/testData/diagnostics/propertyDelegate.kt");
+  @TestMetadata("propertyInitializer.kt")
+  public void testPropertyInitializer() {
+    runTest("compiler-plugin/testData/diagnostics/propertyInitializer.kt");
   }
 
   @Test
@@ -150,6 +150,12 @@ public class JvmDiagnosticTestGenerated extends AbstractJvmDiagnosticTest {
   @TestMetadata("simple.kt")
   public void testSimple() {
     runTest("compiler-plugin/testData/diagnostics/simple.kt");
+  }
+
+  @Test
+  @TestMetadata("superFunction.kt")
+  public void testSuperFunction() {
+    runTest("compiler-plugin/testData/diagnostics/superFunction.kt");
   }
 
   @Test

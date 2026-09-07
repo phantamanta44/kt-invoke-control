@@ -234,6 +234,18 @@ internal class PermissionChecker(
         return wellScoped
     }
 
+    private fun extendContext(declaration: FirDeclaration, parentContext: Context): Context {
+        val subScope = (declaration as? FirFunction)?.let { function ->
+            parentContext.scope setUnion function.valueParameters.mapNotNullTo(mutableSetOf()) {
+                it.getKeyForConstant()
+            }
+        } ?: parentContext.scope
+        val localPermissions = context(dContext, reporter) {
+            resolveService.getDeclarationAnnotatedPermissions(declaration)
+        }.checkWellScoped(subScope)
+        return Context(localPermissions, parentContext.permissions setUnion localPermissions, subScope, null)
+    }
+
     @OptIn(ExperimentalContracts::class)
     private inline fun extendAndCheck(
         declaration: FirDeclaration,
@@ -243,15 +255,7 @@ internal class PermissionChecker(
         contract {
             callsInPlace(check, InvocationKind.EXACTLY_ONCE)
         }
-        val subScope = (declaration as? FirFunction)?.let { function ->
-            parentContext.scope setUnion function.valueParameters.mapNotNullTo(mutableSetOf()) {
-                it.getKeyForConstant()
-            }
-        } ?: parentContext.scope
-        val localPermissions = context(dContext, reporter) {
-            resolveService.getDeclarationAnnotatedPermissions(declaration)
-        }.checkWellScoped(subScope)
-        val subContext = Context(localPermissions, parentContext.permissions setUnion localPermissions, subScope, null)
+        val subContext = extendContext(declaration, parentContext)
         withErrorHandling(declaration.source) {
             check(subContext)
         }
@@ -794,51 +798,66 @@ internal class PermissionChecker(
 
     @OptIn(SymbolInternals::class, ScopeFunctionRequiresPrewarm::class)
     override fun visitProperty(property: FirProperty, data: Context): Nothing? {
-        extendAndCheckReferencedTypePermissions(property, data) { context, builder ->
-            builder.addFromType(property.returnTypeRef)
-            property.receiverParameter?.let { builder.addFromType(it.typeRef) }
-            property.contextParameters.forEach {
-                builder.addFromType(it.returnTypeRef)
-            }
-            val containingClassSymbol = property.getContainingClassSymbol()
-            if (containingClassSymbol is FirClassSymbol<*>) {
-                val scope = containingClassSymbol.fir.unsubstitutedScope(
-                    session, resolveService.scopeSession, true, FirResolvePhase.ANNOTATION_ARGUMENTS
-                )
-                val name = property.name
-                scope.processPropertiesByName(name) {}
-                val superProperties = scope.getDirectOverriddenProperties(property.symbol, true)
-                if (superProperties.isNotEmpty()) {
-                    val superPermissions = mutableSetOf<Permission>()
-                    superProperties.forEach {
-                        val permissions = context(reporter) {
-                            resolveService.getDeclarationAnnotatedPermissions(it.fir)
-                        }
-                        builder.addAll(permissions, PermissionSource.Property(it))
-                        superPermissions.addAll(permissions)
-                    }
-                    checkLeakyPermissions(
-                        property.source,
-                        superPermissions,
-                        PermissionSet.fromPermissions(
-                            context.localPermissions,
-                            PermissionSource.Property(property.symbol)
-                        )
+        val subContext = extendContext(property, data)
+        withErrorHandling(property.source) {
+            checkLeakyPermissions(property.source, subContext.permissions) { builder ->
+                builder.addFromType(property.returnTypeRef)
+                property.receiverParameter?.let { builder.addFromType(it.typeRef) }
+                property.contextParameters.forEach {
+                    builder.addFromType(it.returnTypeRef)
+                }
+                val containingClassSymbol = property.getContainingClassSymbol()
+                if (containingClassSymbol is FirClassSymbol<*>) {
+                    val scope = containingClassSymbol.fir.unsubstitutedScope(
+                        session, resolveService.scopeSession, true, FirResolvePhase.ANNOTATION_ARGUMENTS
                     )
+                    val name = property.name
+                    scope.processPropertiesByName(name) {}
+                    val superProperties = scope.getDirectOverriddenProperties(property.symbol, true)
+                    if (superProperties.isNotEmpty()) {
+                        val superPermissions = mutableSetOf<Permission>()
+                        superProperties.forEach {
+                            val permissions = context(reporter) {
+                                resolveService.getDeclarationAnnotatedPermissions(it.fir)
+                            }
+                            builder.addAll(permissions, PermissionSource.Property(it))
+                            superPermissions.addAll(permissions)
+                        }
+                        checkLeakyPermissions(
+                            property.source,
+                            superPermissions,
+                            PermissionSet.fromPermissions(
+                                subContext.localPermissions,
+                                PermissionSource.Property(property.symbol)
+                            )
+                        )
+                    }
                 }
             }
         }
-        val initializer = property.initializer
-        if (initializer != null) {
-            withErrorHandling(property.source) {
+
+        property.returnTypeRef.accept(this, subContext)
+        property.receiverParameter?.accept(this, subContext)
+        property.contextParameters.forEach { it.accept(this, subContext) }
+        property.initializer?.accept(this, data) // must check in the parent context, since it runs on parent init
+        property.delegate?.accept(this, data) // ditto^
+        property.getter?.accept(this, subContext)
+        property.setter?.accept(this, subContext)
+        property.backingField?.accept(this, subContext)
+        property.annotations.forEach { it.accept(this, subContext) }
+        property.typeParameters.forEach { it.accept(this, subContext) }
+
+        withErrorHandling(property.source) {
+            val initializer = property.initializer
+            if (initializer != null) {
                 context(session.typeContext) {
                     checkAssignment(property, initializer, null, null)
                 }
-            }
-        } else {
-            // must ensure the property type is transformed so the accessor signature checker doesn't complain
-            context(reporter) {
-                resolveService.resolveReturnTypePermissions(property)
+            } else {
+                // must ensure the property type is transformed so the accessor signature checker doesn't complain
+                context(reporter) {
+                    resolveService.resolveReturnTypePermissions(property)
+                }
             }
         }
         return null

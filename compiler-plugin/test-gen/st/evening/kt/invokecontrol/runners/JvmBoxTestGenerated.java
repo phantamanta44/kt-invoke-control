@@ -141,12 +141,6 @@ public class JvmBoxTestGenerated extends AbstractJvmBoxTest {
   }
 
   @Test
-  @TestMetadata("propertyDelegate.kt")
-  public void testPropertyDelegate() {
-    runTest("compiler-plugin/testData/box/propertyDelegate.kt");
-  }
-
-  @Test
   @TestMetadata("readme.kt")
   public void testReadme() {
     runTest("compiler-plugin/testData/box/readme.kt");
@@ -162,6 +156,12 @@ public class JvmBoxTestGenerated extends AbstractJvmBoxTest {
   @TestMetadata("simple.kt")
   public void testSimple() {
     runTest("compiler-plugin/testData/box/simple.kt");
+  }
+
+  @Test
+  @TestMetadata("superFunction.kt")
+  public void testSuperFunction() {
+    runTest("compiler-plugin/testData/box/superFunction.kt");
   }
 
   @Test
