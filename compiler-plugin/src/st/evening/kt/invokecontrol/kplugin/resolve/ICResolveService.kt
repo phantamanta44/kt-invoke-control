@@ -153,7 +153,7 @@ class ICResolveService(
             }
 
             else -> {
-                val symbol = annotation.toAnnotationClassLikeSymbol(session)!!
+                val symbol = annotation.toAnnotationClassLikeSymbol(session) ?: return
                 val substitution = Permission.Substitution { key, source ->
                     val argument = annotation.findArgumentByName(Name.identifier(key)) ?: run {
                         reporter.reportOn(source, ICDiagnostics.KIC_NO_SUCH_PERMISSION_ARGUMENT, key)
